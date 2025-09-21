@@ -6,6 +6,7 @@ const ConquestMonitor = require('./conquest-monitor');
 const HybridConquestAnalyzer = require('./utils/hybridConquestAnalyzer');
 const KillsNotificationScheduler = require('./utils/killsNotificationScheduler');
 const VillageInfoHandler = require('./utils/villageInfoHandler');
+const VillagePointsTracker = require('./utils/villagePointsTracker');
 require('dotenv').config();
 
 // Crear el cliente del bot
@@ -35,6 +36,9 @@ let killsNotificationScheduler = null;
 // Sistema de información de pueblos por coordenadas
 const villageInfoHandler = new VillageInfoHandler();
 
+// Sistema de tracking de puntos de aldeas para análisis de murallas
+let villagePointsTracker = null;
+
 // Cargar comandos slash desde la carpeta commands
 const foldersPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(foldersPath).filter(file => file.endsWith('.js'));
@@ -63,6 +67,9 @@ client.once('clientReady', () => {
     
     // Iniciar el sistema de notificaciones de adversarios
     startKillsNotificationSystem();
+    
+    // Iniciar el sistema de tracking de murallas
+    startWallTrackingSystem();
 });
 
 // Sistema de monitoreo de conquistas
@@ -1169,6 +1176,26 @@ async function startKillsNotificationSystem() {
         console.log('✅ Sistema de notificaciones de adversarios iniciado correctamente');
     } catch (error) {
         console.error('❌ Error iniciando sistema de notificaciones:', error);
+    }
+}
+
+// Sistema de tracking de puntos para análisis de murallas
+async function startWallTrackingSystem() {
+    try {
+        console.log('🏰 Iniciando sistema de tracking de murallas...');
+        
+        villagePointsTracker = new VillagePointsTracker();
+        const initialized = await villagePointsTracker.initialize();
+        
+        if (initialized) {
+            // Iniciar tracking automático cada 2 horas
+            villagePointsTracker.startTracking(2 * 60 * 60 * 1000);
+            console.log('✅ Sistema de tracking de murallas iniciado correctamente');
+        } else {
+            console.error('❌ Falló la inicialización del sistema de tracking de murallas');
+        }
+    } catch (error) {
+        console.error('❌ Error iniciando sistema de tracking de murallas:', error);
     }
 }
 

@@ -50,6 +50,13 @@ class GTDataManager {
     }
 
     /**
+     * Inicializar el manager (método para compatibilidad)
+     */
+    async initialize() {
+        return true; // GTDataManager no necesita inicialización especial
+    }
+
+    /**
      * Realiza una petición HTTP y devuelve los datos
      */
     async fetchData(url) {
@@ -112,6 +119,13 @@ class GTDataManager {
     }
 
     /**
+     * Alias para compatibilidad - obtiene todos los jugadores
+     */
+    async getAllPlayers() {
+        return this.getPlayers();
+    }
+
+    /**
      * Obtiene la lista de tribus desde ally.txt
      */
     async getTribes() {
@@ -155,6 +169,22 @@ class GTDataManager {
             const rawData = await this.fetchData(url);
             return this.parseVillagesData(rawData);
         });
+    }
+
+    /**
+     * Obtiene las aldeas de un jugador específico
+     */
+    async getPlayerVillages(playerId) {
+        const villages = await this.getVillages();
+        return villages.filter(village => village.player_id === playerId);
+    }
+
+    /**
+     * Obtiene una aldea por sus coordenadas
+     */
+    async getVillageByCoordinates(x, y) {
+        const villages = await this.getVillages();
+        return villages.find(village => village.x === x && village.y === y);
     }
 
     /**

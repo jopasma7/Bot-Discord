@@ -1,6 +1,18 @@
 /**
  * Analizador de conquistas híbrido - Compatible con datos de TWStats y GT oficial
- * Procesa conquistas para determinar qué notificaciones enviar
+ * Procesa conquistas para determinar qué notifi        return {
+            timestamp: conquest.timestamp,
+            coordinates: conquest.coordinates,
+            points: conquest.points,
+            oldOwner: {
+                name: conquest.oldOwner?.name || 'Desconocido',
+                tribe: conquest.oldOwner?.tribe || 'Sin tribu'
+            },
+            newOwner: {
+                name: conquest.newOwner?.name || 'Desconocido',
+                tribe: conquest.newOwner?.tribe || 'Sin tribu',
+                tribeId: conquest.newOwner?.tribe === 'Bollo' ? 47 : null
+            },ar
  */
 class HybridConquestAnalyzer {
     constructor() {
@@ -51,6 +63,12 @@ class HybridConquestAnalyzer {
             }
             
             if (isRelevant) {
+                // Verificar que la conquista tiene datos válidos
+                if (!conquest || !conquest.villageName) {
+                    console.warn(`⚠️ [Analyzer] Conquista con datos incompletos ignorada:`, conquest);
+                    continue;
+                }
+                
                 // Crear objeto de conquista unificado
                 const processedConquest = this.createUnifiedConquest(conquest, conquestType);
                 relevantConquests.push(processedConquest);
@@ -134,30 +152,35 @@ class HybridConquestAnalyzer {
      * Crea objeto de conquista unificado compatible con el sistema de notificaciones
      */
     createUnifiedConquest(conquest, conquestType) {
+        // Verificaciones de seguridad para evitar errores de undefined
+        const oldOwner = conquest.oldOwner || {};
+        const newOwner = conquest.newOwner || {};
+        const coordinates = conquest.coordinates || { x: 0, y: 0 };
+        
         // Formato unificado compatible con sendConquestAlert
         return {
-            villageName: conquest.villageName,
-            coordinates: conquest.coordinates,
-            points: conquest.points,
+            villageName: conquest.villageName || 'Unknown Village',
+            coordinates: coordinates,
+            points: conquest.points || 0,
             oldOwner: {
-                name: conquest.oldOwner.name,
-                tribe: conquest.oldOwner.tribe
+                name: oldOwner.name || 'Unknown Player',
+                tribe: oldOwner.tribe || 'No Tribe'
             },
             newOwner: {
-                name: conquest.newOwner.name,
-                tribe: conquest.newOwner.tribe,
-                tribeId: conquest.newOwner.tribe === 'Bollo' ? 47 : null
+                name: newOwner.name || 'Unknown Player',
+                tribe: newOwner.tribe || 'No Tribe',
+                tribeId: newOwner.tribe === 'Bollo' ? 47 : null
             },
             // Crear objetos compatibles con el formato esperado por sendConquestAlert
             village: {
-                name: conquest.villageName,
-                x: conquest.coordinates.x,
-                y: conquest.coordinates.y,
-                points: conquest.points
+                name: conquest.villageName || 'Unknown Village',
+                x: coordinates.x,
+                y: coordinates.y,
+                points: conquest.points || 0
             },
             player: {
-                name: conquest.newOwner.name,
-                tribe: conquest.newOwner.tribe
+                name: newOwner.name || 'Unknown Player',
+                tribe: newOwner.tribe || 'No Tribe'
             },
             timestamp: conquest.timestamp,
             date: conquest.date,
