@@ -90,9 +90,19 @@ class TWStatsConquestMonitor {
 
             const [_, year, month, day, hour, minute, second] = match;
             
-            // Crear fecha en formato ISO para zona horaria española (UTC+1/+2)
-            const isoString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${second.padStart(2, '0')}+01:00`;
-            const date = new Date(isoString);
+            // Crear la fecha interpretando que TWStats da la hora en zona horaria española
+            // Usar el formato ISO con zona horaria de Madrid
+            const dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${second.padStart(2, '0')}`;
+            
+            // Crear una fecha temporal para determinar el offset de España en esa fecha
+            const tempDate = new Date(dateString + 'Z'); // UTC
+            const madridTime = new Date(tempDate.toLocaleString("en-US", {timeZone: "Europe/Madrid"}));
+            const utcTime = new Date(tempDate.toLocaleString("en-US", {timeZone: "UTC"}));
+            const offsetMs = madridTime.getTime() - utcTime.getTime();
+            
+            // Aplicar el offset a la fecha original (asumir que TWStats da hora local española)
+            const date = new Date(dateString + 'Z');
+            date.setTime(date.getTime() - offsetMs);
 
             return Math.floor(date.getTime() / 1000);
             
