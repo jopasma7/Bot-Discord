@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  gt-discord-bot:
+    build: .
+    container_name: gt-discord-bot
+    restart: unless-stopped
+    
+    # Variables de entorno
+    environment:
+      - NODE_ENV=production
+      - TZ=Europe/Madrid
+    
+    # Archivo de variables de entorno (crear gt-bot.env)
+    env_file:
+      - gt-bot.env
+    
+    # Volúmenes para persistir datos
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    
+    # Configuración de logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Configuración de red (opcional)
+    networks:
+      - gt-bot-network
+
+  # Servicio opcional para monitoreo (puedes comentarlo si no lo usas)
+  # watchtower:
+  #   image: containrrr/watchtower
+  #   container_name: watchtower
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   command: --interval 300 gt-discord-bot
+
+networks:
+  gt-bot-network:
+    driver: bridge
+
+volumes:
+  gt-bot-data:
+    driver: local
