@@ -410,9 +410,17 @@ async function handleButtonInteraction(interaction) {
     const customId = interaction.customId;
     
     try {
+        // Manejar botones de análisis de actividad de aldea primero (usan deferReply)
+        if (customId.startsWith('village_activity_')) {
+            // Usar el handler de actividad desde villageInfoHandler
+            await villageInfoHandler.handleActivityAnalysis(interaction);
+            return; // El handler maneja la respuesta completa
+        }
+        
+        // Para todos los otros botones, usar deferUpdate
         await interaction.deferUpdate();
         
-        // Manejar botones específicos de tribu PRIMERO
+        // Manejar botones específicos de tribu
         if (customId.startsWith('tribe_ranking_')) {
             const tribeId = parseInt(customId.split('_')[2]);
             const tribes = await gtData.getTribes();

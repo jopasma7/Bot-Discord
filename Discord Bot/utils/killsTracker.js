@@ -159,14 +159,14 @@ class KillsTracker {
     }
 
     /**
-     * Obtiene los datos actuales de kills
+     * Obtiene los datos actuales de kills (con opción de forzar descarga)
      */
-    async getCurrentKillsData() {
+    async getCurrentKillsData(forceDownload = false) {
         const [allKills, attackKills, defenseKills, supportKills] = await Promise.all([
-            this.killsManager.getAllKills(),
-            this.killsManager.getAttackKills(),
-            this.killsManager.getDefenseKills(),
-            this.killsManager.getSupportKills()
+            this.killsManager.getAllKills(forceDownload),
+            this.killsManager.getAttackKills(forceDownload),
+            this.killsManager.getDefenseKills(forceDownload),
+            this.killsManager.getSupportKills(forceDownload)
         ]);
 
         const killsData = {
@@ -347,28 +347,30 @@ class KillsTracker {
             totalPlayers: players.length,
             totals,
             topGainers,
-            summary: `${players.length} jugadores ganaron adversarios en la última hora`
+            summary: `${players.length} jugadores ganaron adversarios en las últimas 2 horas`
         };
     }
 
     /**
      * Ejecuta un ciclo completo de tracking con lógica mejorada
      */
-    async trackKills(saveData = true) {
+    async trackKills(saveData = true, forceDownload = false) {
         console.log('[KillsTracker] Iniciando tracking de adversarios...');
 
         try {
             await this.initialize();
             const hadPreviousData = await this.loadPreviousData();
-            const currentData = await this.getCurrentKillsData();
+            const currentData = await this.getCurrentKillsData(forceDownload);
 
             if (hadPreviousData && this.lastData) {
                 // Verificar que no sea un check muy reciente (evitar spam para verificaciones manuales)
                 const timeSinceLastCheck = Date.now() - (this.lastData.checkTime || 0);
                 const isRecentCheck = timeSinceLastCheck < 5 * 60 * 1000; // 5 minutos
                 
-                if (isRecentCheck) {
+                if (isRecentCheck && !forceDownload) {
                     console.log(`[KillsTracker] Check reciente (${Math.round(timeSinceLastCheck/1000/60)} min), continuando con comparación normal`);
+                } else if (forceDownload) {
+                    console.log('[KillsTracker] Descarga forzada - datos frescos desde servidor');
                 }
 
                 // Siempre hacer la comparación, independientemente del tiempo

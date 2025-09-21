@@ -1,4 +1,7 @@
 const fetch = require('node-fetch');
+const zlib = require('zlib');
+const fs = require('fs').promises;
+const path = require('path');
 
 class KillsDataManager {
     constructor() {
@@ -10,42 +13,159 @@ class KillsDataManager {
         };
         this.cacheTime = 5 * 60 * 1000; // 5 minutos en milisegundos
         this.baseUrl = 'https://es95.guerrastribales.es/map/';
+        this.dataPath = path.join(__dirname, '..', 'data', 'kills');
+        this.initializeDataDirectory();
     }
 
-    async getData(type) {
-        const now = Date.now();
-        const cached = this.cache[type];
-        
-        if (cached.data && (now - cached.lastFetch) < this.cacheTime) {
-            return cached.data;
-        }
-
+    /**
+     * Inicializa el directorio de datos si no existe
+     */
+    async initializeDataDirectory() {
         try {
-            const url = `${this.baseUrl}${type}.txt`;
-            console.log(`[KillsData] Fetching ${type} from ${url}`);
+            await fs.mkdir(this.dataPath, { recursive: true });
+            console.log('[KillsData] Directorio de datos inicializado');
+        } catch (error) {
+            console.error('[KillsData] Error creando directorio:', error);
+        }
+    }
+
+    /**
+     * Obtiene la ruta del archivo local para un tipo de kill
+     */
+    getLocalFilePath(type) {
+        return path.join(this.dataPath, `${type}.txt.gz`);
+    }
+
+    /**
+     * Carga datos desde archivo local si existe
+     */
+    async loadFromLocalFile(type) {
+        try {
+            const filePath = this.getLocalFilePath(type);
+            const fileExists = await fs.access(filePath).then(() => true).catch(() => false);
+            
+            if (!fileExists) {
+                console.log(`[KillsData] Archivo local ${type}.txt.gz no existe`);
+                return null;
+            }
+
+            const compressedData = await fs.readFile(filePath);
+            const text = zlib.gunzipSync(compressedData).toString();
+            const parsedData = this.parseKillData(text);
+            
+            console.log(`[KillsData] Cargados ${parsedData.length} registros desde ${type}.txt.gz local`);
+            return parsedData;
+        } catch (error) {
+            console.error(`[KillsData] Error cargando archivo local ${type}:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Guarda datos comprimidos en archivo local
+     */
+    async saveToLocalFile(type, text) {
+        try {
+            const filePath = this.getLocalFilePath(type);
+            const compressedData = zlib.gzipSync(text);
+            await fs.writeFile(filePath, compressedData);
+            console.log(`[KillsData] Archivo ${type}.txt.gz guardado localmente`);
+        } catch (error) {
+            console.error(`[KillsData] Error guardando archivo local ${type}:`, error);
+        }
+    }
+
+    /**
+     * Descarga y guarda archivo .txt.gz desde la web
+     */
+    async downloadAndSave(type) {
+        try {
+            const url = `${this.baseUrl}${type}.txt.gz`;
+            console.log(`[KillsData] Descargando ${type} desde ${url}`);
             
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
-            const text = await response.text();
-            const parsedData = this.parseKillData(text);
+            const buffer = await response.buffer();
+            const text = zlib.gunzipSync(buffer).toString();
             
+            // Guardar archivo comprimido localmente
+            await this.saveToLocalFile(type, text);
+            
+            return this.parseKillData(text);
+        } catch (error) {
+            console.error(`[KillsData] Error descargando ${type}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Obtiene datos con la nueva lógica: prioriza archivos locales en startup
+     */
+    async getData(type, forceDownload = false) {
+        const now = Date.now();
+        const cached = this.cache[type];
+        
+        // Si hay datos en cache y no son muy antiguos, usarlos
+        if (cached.data && (now - cached.lastFetch) < this.cacheTime && !forceDownload) {
+            return cached.data;
+        }
+
+        try {
+            let parsedData = null;
+
+            if (forceDownload) {
+                // Forzar descarga para actualizaciones programadas
+                parsedData = await this.downloadAndSave(type);
+                console.log(`[KillsData] Descarga forzada completada para ${type}: ${parsedData.length} registros`);
+            } else {
+                // Intentar cargar desde archivo local primero
+                parsedData = await this.loadFromLocalFile(type);
+                
+                if (!parsedData) {
+                    // Si no existe archivo local, descargar por primera vez
+                    console.log(`[KillsData] Primera descarga de ${type}...`);
+                    parsedData = await this.downloadAndSave(type);
+                }
+            }
+
+            // Actualizar cache
             cached.data = parsedData;
             cached.lastFetch = now;
-            
-            console.log(`[KillsData] Successfully cached ${parsedData.length} ${type} entries`);
+
             return parsedData;
         } catch (error) {
-            console.error(`[KillsData] Error fetching ${type}:`, error);
-            // Si hay error, devolver cache aunque esté vencido si existe
+            console.error(`[KillsData] Error obteniendo ${type}:`, error);
+            
+            // Fallback: intentar cargar archivo local aunque haya error
+            if (forceDownload) {
+                const localData = await this.loadFromLocalFile(type);
+                if (localData) {
+                    console.log(`[KillsData] Usando datos locales como fallback para ${type}`);
+                    return localData;
+                }
+            }
+            
+            // Último fallback: cache vencido
             return cached.data || [];
         }
     }
 
     parseKillData(text) {
-        return text.trim().split('\n')
+        // ARREGLO: El servidor sirve archivos sin separadores de línea
+        // Necesitamos agregar \n después de cada patrón: número,número,número
+        let fixedText = text.trim();
+        
+        // Si el texto no tiene saltos de línea, agregarlos después de cada entrada
+        if (fixedText.split('\n').length === 1 && fixedText.includes(',')) {
+            // Usar regex para encontrar patrones: dígitos,dígitos,dígitos
+            // Y reemplazarlos añadiendo \n al final (excepto el último)
+            fixedText = fixedText.replace(/(\d+,\d+,\d+)(?=\d+,)/g, '$1\n');
+        }
+        
+        return fixedText.split('\n')
             .filter(line => line.trim())
             .map(line => {
                 const [ranking, playerId, kills] = line.split(',').map(item => parseInt(item.trim()));
@@ -58,28 +178,49 @@ class KillsDataManager {
             .sort((a, b) => a.ranking - b.ranking);
     }
 
-    async getAllKills() {
-        return await this.getData('kill_all');
+    // Métodos públicos con nuevas opciones
+    async getAllKills(forceDownload = false) {
+        return await this.getData('kill_all', forceDownload);
     }
 
-    async getAttackKills() {
-        return await this.getData('kill_att');
+    async getAttackKills(forceDownload = false) {
+        return await this.getData('kill_att', forceDownload);
     }
 
-    async getDefenseKills() {
-        return await this.getData('kill_def');
+    async getDefenseKills(forceDownload = false) {
+        return await this.getData('kill_def', forceDownload);
     }
 
-    async getSupportKills() {
-        return await this.getData('kill_sup');
+    async getSupportKills(forceDownload = false) {
+        return await this.getData('kill_sup', forceDownload);
     }
 
-    async getPlayerKills(playerId) {
+    /**
+     * Fuerza la descarga de todos los archivos (para actualizaciones programadas)
+     */
+    async forceUpdateAll() {
+        console.log('[KillsData] Forzando actualización de todos los archivos...');
         const [allKills, attackKills, defenseKills, supportKills] = await Promise.all([
-            this.getAllKills(),
-            this.getAttackKills(),
-            this.getDefenseKills(),
-            this.getSupportKills()
+            this.getAllKills(true),
+            this.getAttackKills(true),
+            this.getDefenseKills(true),
+            this.getSupportKills(true)
+        ]);
+
+        return {
+            all: allKills,
+            attack: attackKills,
+            defense: defenseKills,
+            support: supportKills
+        };
+    }
+
+    async getPlayerKills(playerId, forceDownload = false) {
+        const [allKills, attackKills, defenseKills, supportKills] = await Promise.all([
+            this.getAllKills(forceDownload),
+            this.getAttackKills(forceDownload),
+            this.getDefenseKills(forceDownload),
+            this.getSupportKills(forceDownload)
         ]);
 
         const playerAll = allKills.find(p => p.playerId === playerId) || { ranking: 0, kills: 0 };
@@ -95,8 +236,8 @@ class KillsDataManager {
         };
     }
 
-    async getTopKillers(type = 'kill_all', limit = 10) {
-        const data = await this.getData(type);
+    async getTopKillers(type = 'kill_all', limit = 10, forceDownload = false) {
+        const data = await this.getData(type, forceDownload);
         return data.slice(0, limit);
     }
 

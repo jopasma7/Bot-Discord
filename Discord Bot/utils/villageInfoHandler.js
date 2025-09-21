@@ -1,9 +1,11 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const VillageActivityAnalyzer = require('./villageActivityAnalyzer');
 
 class VillageInfoHandler {
     constructor() {
         this.coordinateRegex = /(\d{1,3})\|(\d{1,3})/g;
         this.gameUrl = 'https://es95.guerrastribales.es/game.php';
+        this.activityAnalyzer = new VillageActivityAnalyzer();
     }
 
     /**
@@ -75,7 +77,14 @@ class VillageInfoHandler {
                     .setLabel('🎯 Ver en Mapa')
                     .setStyle(ButtonStyle.Link)
                     .setURL(mapUrl);
-                const components = [new ActionRowBuilder().addComponents(mapButton)];
+                
+                const activityButton = new ButtonBuilder()
+                    .setCustomId(`village_activity_${coord.x}_${coord.y}`)
+                    .setLabel('📊 Análisis de Actividad')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setEmoji('🕵️');
+
+                const components = [new ActionRowBuilder().addComponents(mapButton, activityButton)];
 
                 await message.reply({
                     embeds: [embed],
@@ -91,6 +100,143 @@ class VillageInfoHandler {
                 console.error(`[VillageInfo] Error procesando ${coord.x}|${coord.y}:`, error);
             }
         }
+    }
+
+    /**
+     * Maneja la interacción del botón de análisis de actividad
+     * @param {ButtonInteraction} interaction - Interacción del botón
+     */
+    async handleActivityAnalysis(interaction) {
+        // Parsear coordenadas del customId
+        const match = interaction.customId.match(/village_activity_(\d+)_(\d+)/);
+        if (!match) {
+            await interaction.reply({ content: '❌ Error: No se pudieron obtener las coordenadas.', ephemeral: true });
+            return;
+        }
+
+        const x = parseInt(match[1]);
+        const y = parseInt(match[2]);
+
+        await interaction.deferReply();
+
+        try {
+            // Obtener Village ID desde las coordenadas
+            console.log(`[VillageInfo] Iniciando análisis de actividad para ${x}|${y}`);
+            const villageId = await this.activityAnalyzer.getVillageIdFromCoordinates(x, y);
+            
+            if (!villageId) {
+                await interaction.editReply({ 
+                    content: `❌ No se pudo encontrar una aldea en las coordenadas ${x}|${y}.\n\n💡 La aldea puede no existir o estar abandonada.`
+                });
+                return;
+            }
+
+            // Obtener información básica de la aldea desde GT Data
+            const GTDataManager = require('./gtData');
+            const gtData = new GTDataManager();
+            const villages = await gtData.getVillages();
+            const players = await gtData.getPlayers();
+            const village = villages.find(v => v.id === villageId);
+            const player = village ? players.find(p => p.id === village.playerId) : null;
+
+            // Obtener historial de la aldea
+            console.log(`[VillageInfo] Obteniendo historial para village ID: ${villageId}`);
+            const villageData = await this.activityAnalyzer.getVillageHistory(villageId);
+
+            if (!villageData.history || villageData.history.length === 0) {
+                await interaction.editReply({
+                    content: `📊 **Análisis de ${x}|${y}**\n\n❌ No hay suficiente historial de actividad disponible para esta aldea.\n\n💡 TWStats necesita tiempo para recopilar datos de actividad.`
+                });
+                return;
+            }
+
+            // Analizar patrones de actividad usando puntos de registros históricos
+            const analysis = this.activityAnalyzer.analyzeActivityPatterns(villageData.history);
+
+            // Crear embed con los resultados
+            const embed = this.createActivityAnalysisEmbed(x, y, village, player, villageData, analysis);
+            
+            await interaction.editReply({ embeds: [embed] });
+
+        } catch (error) {
+            console.error(`[VillageInfo] Error en análisis de actividad para ${x}|${y}:`, error);
+            await interaction.editReply({
+                content: `❌ **Error al analizar ${x}|${y}**\n\n${error.message}\n\n💡 La aldea puede no existir o TWStats puede no estar disponible temporalmente.`
+            });
+        }
+    }
+
+    /**
+     * Crea el embed con los resultados del análisis avanzado de actividad
+     */
+    createActivityAnalysisEmbed(x, y, village, player, villageData, analysis) {
+        const embed = new EmbedBuilder()
+            .setColor('#FF6B35')
+            .setTitle(`🕵️ Análisis Avanzado de Actividad - ${x}|${y}`)
+            .setDescription(`**Aldea:** ${village?.name || 'Desconocida'}\n**Propietario:** ${player?.name || 'Desconocido'}${player ? `\n**Puntos:** ${player.points?.toLocaleString() || 'N/A'}` : ''}${player?.tribe ? `\n**Tribu:** ${player.tribe}` : ''}`)
+            .setFooter({ text: `Análisis basado en ${analysis.totalEntries} entradas (${analysis.reliableEntries} confiables ≤2500pts) • TWStats ES95` })
+            .setTimestamp();
+
+        // Información de procedencia con nivel de jugador
+        let confidenceEmoji = '🔍';
+        if (analysis.confidence === 'muy alta') confidenceEmoji = '🟢';
+        else if (analysis.confidence === 'alta') confidenceEmoji = '✅';
+        else if (analysis.confidence === 'media') confidenceEmoji = '⚠️';
+        else if (analysis.confidence === 'baja') confidenceEmoji = '🟡';
+        else confidenceEmoji = '🔴';
+
+        // Mostrar nivel de análisis
+        const levelInfo = analysis.playerLevel === 'early_game' ? 
+            '🌱 **Jugador Inicial** (Datos más confiables)' : 
+            '⚔️ **Jugador Avanzado** (Posibles colas automáticas)';
+
+        embed.addFields(
+            {
+                name: '🌍 Zona Horaria Estimada',
+                value: `${confidenceEmoji} **${analysis.timezone}** (Confianza: ${analysis.confidence})\n📝 ${analysis.pattern}\n${levelInfo}`,
+                inline: false
+            }
+        );
+
+        // Mostrar patrón de inactividad de forma simple
+        if (analysis.consistentSleepPatterns && analysis.consistentSleepPatterns.length > 0) {
+            const mainPattern = analysis.consistentSleepPatterns[0];
+            embed.addFields({
+                name: '😴 Inactivo de',
+                value: `**${mainPattern.timeRange.replace('-', ':00 a ')}:00**`,
+                inline: true
+            });
+        }
+
+        // Solo mostrar la zona horaria estimada de forma simple
+        if (analysis.timezone) {
+            embed.addFields({
+                name: '🌍 Zona Estimada',
+                value: `**${analysis.timezone}**`,
+                inline: true
+            });
+        }
+
+        return embed;
+    }
+
+    /**
+     * Crea un gráfico simple de actividad por horas usando caracteres
+     */
+    createActivityGraph(hourlyActivity) {
+        const maxPercentage = Math.max(...hourlyActivity.map(h => h.percentage));
+        const maxBarLength = 15;
+        
+        return hourlyActivity
+            .filter(h => h.percentage > 0)
+            .sort((a, b) => b.percentage - a.percentage)
+            .slice(0, 10)
+            .map(hour => {
+                const barLength = Math.round((hour.percentage / maxPercentage) * maxBarLength);
+                const bar = '█'.repeat(barLength) + '░'.repeat(maxBarLength - barLength);
+                return `\`${hour.hour} ${bar} ${hour.percentage}%\``;
+            })
+            .join('\n');
     }
 }
 

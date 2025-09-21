@@ -24,8 +24,8 @@ class KillsNotificationScheduler {
 
         console.log('[NotificationScheduler] Iniciando sistema de notificaciones...');
 
-        // Programar verificación cada hora en punto
-        this.mainJob = cron.schedule('0 * * * *', async () => {
+        // Programar verificación cada 2 horas en punto (horas pares)
+        this.mainJob = cron.schedule('0 */2 * * *', async () => {
             await this.checkAndSendNotifications();
         }, {
             scheduled: false,
@@ -36,11 +36,18 @@ class KillsNotificationScheduler {
         this.isRunning = true;
 
         console.log('[NotificationScheduler] ✅ Sistema de notificaciones iniciado');
-        console.log('[NotificationScheduler] ⏰ Verificaciones programadas cada hora en punto');
+        console.log('[NotificationScheduler] ⏰ Verificaciones programadas cada 2 horas en punto');
 
-        // Ejecutar una verificación inicial después de 1 minuto
+        // Ejecutar una verificación inicial después de 1 minuto (sin forzar descarga)
         setTimeout(async () => {
-            await this.checkAndSendNotifications();
+            console.log('[NotificationScheduler] 🔄 Ejecutando verificación inicial (carga desde archivos locales si existen)...');
+            
+            const config = await this.loadConfig();
+            for (const [guildId, guildConfig] of Object.entries(config)) {
+                if (guildConfig.enabled) {
+                    await this.sendNotificationToGuild(guildId, guildConfig, false); // Sin forzar descarga
+                }
+            }
         }, 60000);
     }
 
@@ -75,7 +82,7 @@ class KillsNotificationScheduler {
 
                 // Verificar si es hora de enviar notificación según el intervalo
                 if (this.shouldSendNotification(currentHour, guildConfig.interval)) {
-                    await this.sendNotificationToGuild(guildId, guildConfig);
+                    await this.sendNotificationToGuild(guildId, guildConfig, true); // Forzar descarga
                 }
             }
 
@@ -89,13 +96,18 @@ class KillsNotificationScheduler {
      */
     shouldSendNotification(currentHour, interval) {
         const hours = parseInt(interval.replace('h', ''));
+        // Para intervalos de 2h, verificar horas pares
+        if (hours === 2) {
+            return currentHour % 2 === 0;
+        }
+        // Para otros intervalos, mantener lógica original
         return currentHour % hours === 0;
     }
 
     /**
      * Envía notificación a un servidor específico
      */
-    async sendNotificationToGuild(guildId, guildConfig) {
+    async sendNotificationToGuild(guildId, guildConfig, forceDownload = false) {
         try {
             const guild = this.client.guilds.cache.get(guildId);
             if (!guild) {
@@ -109,10 +121,11 @@ class KillsNotificationScheduler {
                 return;
             }
 
-            console.log(`[NotificationScheduler] 📊 Ejecutando tracking para ${guild.name}...`);
+            const downloadType = forceDownload ? 'descarga forzada' : 'archivos locales/cache';
+            console.log(`[NotificationScheduler] 📊 Ejecutando tracking para ${guild.name} (${downloadType})...`);
 
             // Ejecutar tracking de kills
-            const result = await this.tracker.trackKills();
+            const result = await this.tracker.trackKills(true, forceDownload);
 
             // SIEMPRE enviar notificación (con o sin cambios)
             const embeds = await this.createNotificationEmbeds(result);
@@ -146,10 +159,45 @@ class KillsNotificationScheduler {
         const defenseTotal = summary.totals?.defense || 0;
         const supportTotal = summary.totals?.support || 0;
         
-        // CORREGIDO: Calcular porcentajes basados en el total real, no en 0
-        const attackPct = total > 0 ? Math.round((attackTotal / total) * 100) : 0;
-        const defensePct = total > 0 ? Math.round((defenseTotal / total) * 100) : 0;
-        const supportPct = total > 0 ? Math.round((supportTotal / total) * 100) : 0;
+        // ARREGLADO: Calcular porcentajes correctos
+        let attackPct = 0, defensePct = 0, supportPct = 0;
+        if (total > 0) {
+            // Calcular porcentajes exactos
+            const attackExact = (attackTotal / total) * 100;
+            const defenseExact = (defenseTotal / total) * 100;
+            const supportExact = (supportTotal / total) * 100;
+            
+            // Redondear individualmente
+            attackPct = Math.round(attackExact);
+            defensePct = Math.round(defenseExact);
+            supportPct = Math.round(supportExact);
+            
+            // Ajustar para que sume exactamente 100%
+            const sum = attackPct + defensePct + supportPct;
+            const diff = 100 - sum;
+            
+            if (diff !== 0) {
+                // Encontrar cuál categoría tiene el mayor valor para ajustar
+                const values = [
+                    { type: 'attack', value: attackTotal, exact: attackExact },
+                    { type: 'defense', value: defenseTotal, exact: defenseExact },
+                    { type: 'support', value: supportTotal, exact: supportExact }
+                ];
+                
+                // Ordenar por valor total descendente para ajustar el más grande
+                values.sort((a, b) => b.value - a.value);
+                
+                // Ajustar el porcentaje de la categoría más grande
+                if (values[0].type === 'attack') {
+                    attackPct += diff;
+                } else if (values[0].type === 'defense') {
+                    defensePct += diff;
+                } else {
+                    supportPct += diff;
+                }
+            }
+        }
+        // Cuando total = 0, todos los porcentajes permanecen en 0%
 
         // Crear barras de progreso (10 caracteres)
         const createBar = (value, max) => {
@@ -166,7 +214,8 @@ class KillsNotificationScheduler {
         const shortTime = timeText.includes('hora') ? timeText.replace(' horas', 'h').replace(' hora', 'h') : timeText;
 
         // Descripción principal con barras compactas
-        let description = `🏆 Adversarios - ${shortTime} | ${summary.totalPlayers} jugadores | ${total.toLocaleString()} total\n\n`;
+        const playersWithChanges = summary.topGainers ? summary.topGainers.length : 0;
+        let description = `🏆 Adversarios - ${shortTime} | ${playersWithChanges} jugadores | ${total.toLocaleString()} total\n\n`;
         
         description += `⚡ ATK ${attackTotal.toLocaleString().padStart(5)} ${createBar(attackTotal, maxCategoryValue)} ${attackPct}%\n`;
         description += `🛡️ DEF ${defenseTotal.toLocaleString().padStart(5)} ${createBar(defenseTotal, maxCategoryValue)} ${defensePct}%\n`;
@@ -182,11 +231,11 @@ class KillsNotificationScheduler {
             playersToShow.forEach((player, index) => {
                 const emoji = emojis[index] || '▫️';
                 
-                // Obtener tribu (máximo 4 caracteres para el tag)
+                // Obtener tribu
                 const tribeTag = player.playerData?.tribe?.tag || null;
-                const tribe = tribeTag ? `[${tribeTag.substring(0, 4)}]` : '';
+                const tribe = tribeTag ? `[${tribeTag}]` : '';
                 
-                // Obtener nombre del jugador con mejor fallback
+                // Obtener nombre del jugador
                 let playerName;
                 if (player.playerData?.name && player.playerData.name.trim() !== '') {
                     playerName = player.playerData.name;
@@ -194,20 +243,16 @@ class KillsNotificationScheduler {
                     playerName = `${player.playerId}`;
                 }
                 
-                // Formatear nombre completo con tribu (máximo 15 caracteres total)
-                let fullName = tribe ? `${tribe} ${playerName}` : playerName;
-                fullName = fullName.substring(0, 15).padEnd(15);
+                // Formatear nombre completo
+                const fullName = tribe ? `${tribe} ${playerName}` : playerName;
                 
-                // Formatear totales ganados con padding
-                const totalGained = `+${player.totalGained}`.padStart(6);
+                // Obtener kills por categoría
+                const attack = player.categories.attack?.gained || 0;
+                const defense = player.categories.defense?.gained || 0;
+                const support = player.categories.support?.gained || 0;
                 
-                // Obtener kills por categoría con padding mejorado
-                const attack = (player.categories.attack?.gained || 0).toString().padStart(4);
-                const defense = (player.categories.defense?.gained || 0).toString().padStart(4);
-                const support = (player.categories.support?.gained || 0).toString().padStart(3);
-                
-                // Formato mejorado con espaciado uniforme
-                description += `${emoji} ${fullName} ${totalGained} (⚡${attack} 🛡️${defense} 🤝${support})\n`;
+                // Formato original limpio con espacios mejorados
+                description += `${emoji} ${fullName} +${player.totalGained} (⚡ ${attack} 🛡️ ${defense} 🤝 ${support})\n`;
             });
         }
 
@@ -216,7 +261,7 @@ class KillsNotificationScheduler {
             .setTitle('📊 Reporte de Adversarios Ganados')
             .setDescription(description)
             .setFooter({ 
-                text: `Sistema GT ES95 • Próxima verificación en ~1h` 
+                text: `Sistema GT ES95 • Próxima verificación en ~2h` 
             })
             .setTimestamp();
 
