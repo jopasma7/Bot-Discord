@@ -37,11 +37,18 @@ class VillageActivityAnalyzer {
             const villageUrl = `${this.twstatsBaseUrl}/index.php?page=village&id=${villageId}`;
             console.log(`[ActivityAnalyzer] Obteniendo historial de aldea ID: ${villageId}`);
             
+            // Crear un AbortController para timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos
+            
             const response = await fetch(villageUrl, {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                }
+                },
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
@@ -62,7 +69,21 @@ class VillageActivityAnalyzer {
 
         } catch (error) {
             console.error(`[ActivityAnalyzer] Error obteniendo historial para village ${villageId}:`, error);
-            throw error;
+            
+            // Crear un mensaje de error más específico según el tipo de error
+            let errorMessage = 'Error desconocido';
+            if (error.name === 'AbortError') {
+                errorMessage = 'Timeout: TWStats tardó demasiado en responder';
+            } else if (error.message.includes('HTTP')) {
+                errorMessage = `TWStats respondió con error ${error.message}`;
+            } else if (error.message.includes('fetch') || error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+                errorMessage = 'No se pudo conectar con TWStats (servidor no disponible)';
+            } else if (error.message.includes('timeout')) {
+                errorMessage = 'Timeout conectando con TWStats';
+            }
+            
+            // Re-lanzar el error con más contexto
+            throw new Error(errorMessage);
         }
     }
 

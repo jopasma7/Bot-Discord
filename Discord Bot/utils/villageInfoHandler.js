@@ -141,11 +141,21 @@ class VillageInfoHandler {
 
             // Obtener historial de la aldea
             console.log(`[VillageInfo] Obteniendo historial para village ID: ${villageId}`);
-            const villageData = await this.activityAnalyzer.getVillageHistory(villageId);
+            let villageData;
+            
+            try {
+                villageData = await this.activityAnalyzer.getVillageHistory(villageId);
+            } catch (error) {
+                console.error(`[VillageInfo] Error conectando con TWStats para ${x}|${y}:`, error);
+                await interaction.editReply({
+                    content: `📊 **Análisis de ${x}|${y}**\n\n❌ No se pudo conectar con TWStats en este momento.\n\n💡 **Posibles causas:**\n• TWStats está temporalmente no disponible\n• Problemas de conectividad\n• La aldea no existe\n\n🔄 **Solución:** Inténtalo de nuevo en unos minutos.`
+                });
+                return;
+            }
 
             if (!villageData.history || villageData.history.length === 0) {
                 await interaction.editReply({
-                    content: `📊 **Análisis de ${x}|${y}**\n\n❌ No hay suficiente historial de actividad disponible para esta aldea.\n\n💡 TWStats necesita tiempo para recopilar datos de actividad.`
+                    content: `📊 **Análisis de ${x}|${y}**\n\n❌ No hay suficiente historial de actividad disponible para esta aldea.\n\n💡 **Posibles causas:**\n• La aldea es muy nueva\n• La aldea ha sido recientemente conquistada\n• TWStats aún está recopilando datos\n\n⏰ **Solución:** Espera unas horas y vuelve a intentarlo.`
                 });
                 return;
             }
