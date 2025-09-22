@@ -149,39 +149,78 @@ class VillageActivityAnalyzer {
             const tableMatch = html.match(/<table[^>]*>[\s\S]*?<\/table>/gi);
             
             if (!tableMatch) {
-                console.log('[ActivityAnalyzer] No se encontró tabla de historial');
+                console.log('[ActivityAnalyzer] No se encontró ninguna tabla en el HTML');
                 return history;
             }
 
+            console.log(`[ActivityAnalyzer] Encontradas ${tableMatch.length} tablas en total`);
+
             // Buscar la tabla que contiene el historial (normalmente la más grande)
             let historyTable = '';
-            for (const table of tableMatch) {
+            let tableIndex = -1;
+            
+            for (let i = 0; i < tableMatch.length; i++) {
+                const table = tableMatch[i];
+                console.log(`[ActivityAnalyzer] Tabla ${i}: contiene fecha 2025? ${table.includes('2025-')}, contiene +? ${table.includes('+')}`);
+                
                 if (table.includes('2025-') && table.includes('+')) {
                     historyTable = table;
+                    tableIndex = i;
                     break;
                 }
             }
 
             if (!historyTable) {
-                console.log('[ActivityAnalyzer] No se encontró tabla de historial válida');
+                console.log('[ActivityAnalyzer] No se encontró tabla de historial válida con fechas 2025 y símbolo +');
+                
+                // Buscar solo por fechas 2025 como fallback
+                for (let i = 0; i < tableMatch.length; i++) {
+                    const table = tableMatch[i];
+                    if (table.includes('2025-')) {
+                        console.log(`[ActivityAnalyzer] Encontrada tabla con fechas 2025 (fallback): tabla ${i}`);
+                        historyTable = table;
+                        tableIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            if (!historyTable) {
+                console.log('[ActivityAnalyzer] No se encontró tabla con fechas válidas');
                 return history;
             }
 
+            console.log(`[ActivityAnalyzer] Usando tabla ${tableIndex} para análisis de historial`);
+
             // Extraer filas de la tabla
             const rowMatches = historyTable.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+            console.log(`[ActivityAnalyzer] Encontradas ${rowMatches.length} filas en la tabla de historial`);
             
-            for (const row of rowMatches) {
-                const cells = row.match(/<td[^>]*>([^<]*(?:<[^>]*>[^<]*)*)</gi);
-                if (!cells || cells.length < 4) continue;
+            for (let i = 0; i < rowMatches.length; i++) {
+                const row = rowMatches[i];
+                // Mejorar el regex para capturar contenido de celdas con HTML interno
+                const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
+                
+                if (!cells || cells.length < 4) {
+                    if (i < 5) console.log(`[ActivityAnalyzer] Fila ${i} ignorada: ${cells?.length || 0} celdas encontradas`);
+                    continue;
+                }
 
                 // Limpiar contenido de las celdas
-                const cleanCells = cells.map(cell => 
-                    cell.replace(/<[^>]*>/g, '').trim()
-                );
+                const cleanCells = cells.map(cell => {
+                    // Extraer solo el contenido entre <td> y </td>, luego limpiar HTML
+                    const content = cell.replace(/<td[^>]*>([\s\S]*?)<\/td>/i, '$1');
+                    return content.replace(/<[^>]*>/g, '').trim();
+                });
+
+                if (i < 3) console.log(`[ActivityAnalyzer] Fila ${i} células limpias:`, cleanCells);
 
                 // Parsear fecha y hora (formato esperado: 2025-09-21 14:04)
                 const dateTimeMatch = cleanCells[0]?.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
-                if (!dateTimeMatch) continue;
+                if (!dateTimeMatch) {
+                    if (i < 5) console.log(`[ActivityAnalyzer] Fila ${i}: no coincide formato fecha/hora: "${cleanCells[0]}"`);
+                    continue;
+                }
 
                 const [, date, time] = dateTimeMatch;
                 const points = parseInt(cleanCells[1]) || 0;
