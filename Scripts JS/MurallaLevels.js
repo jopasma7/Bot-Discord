@@ -2,7 +2,7 @@
 /* Versión: 1.0 */
 /* Este script sirve para calcular los niveles de muralla que dispone el pueblo según los puntos del pueblo */
 
-javascript:
+//javascript:
 var puntuaciones = [0,8,2,2,2,3,3,4,5,5,7,9,9,12,15,17,20,25,29,36,43];
 var puntosAntes=parseInt(prompt('Puntuación del Pueblo (Antes)'));
 var pointsContentString = content_value.getElementsByTagName('table')[1].getElementsByTagName('td')[4].textContent;

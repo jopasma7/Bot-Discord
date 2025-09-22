@@ -29,7 +29,7 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN);
         // Registrar comandos globalmente (tardan hasta 1 hora en aparecer)
         // Para desarrollo, es mejor registrar en un servidor específico
         const data = await rest.put(
-            Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+            Routes.applicationCommands(process.env.CLIENT_ID),
             { body: commands },
         );
 
