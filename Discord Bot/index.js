@@ -52,6 +52,10 @@ async function initializeAutomaticSystems(client) {
         // Sistema de monitoreo de conquistas
         console.log('🏰 Iniciando sistema de monitoreo de conquistas...');
         const conquestMonitor = new ConquestAutoMonitor(client);
+        
+        // Hacer el monitor accesible globalmente para comandos
+        client.conquestMonitor = conquestMonitor;
+        
         await conquestMonitor.start();
         console.log('✅ Sistema de monitoreo de conquistas iniciado correctamente');
         

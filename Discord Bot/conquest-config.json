@@ -6,5 +6,9 @@
   "gainsChannelId": "1419034246122836171",
   "lossesChannelId": "1418653303671099537",
   "mode": "economy",
-  "interval": 300000
+  "interval": 300000,
+  "tribeFilter": {
+    "type": "all",
+    "specificTribe": null
+  }
 }

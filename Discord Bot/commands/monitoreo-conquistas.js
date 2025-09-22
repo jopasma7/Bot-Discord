@@ -299,6 +299,16 @@ module.exports = {
                     
                     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
                     
+                    // Reiniciar el monitor para aplicar nuevo filtro
+                    if (config.enabled && interaction.client.conquestMonitor) {
+                        console.log(`🔄 Reiniciando monitor con filtro: ${filtroTipo} ${nombreTribu || ''}`);
+                        try {
+                            await interaction.client.conquestMonitor.restart();
+                        } catch (error) {
+                            console.error('❌ Error reiniciando monitor:', error);
+                        }
+                    }
+                    
                     // Preparar respuesta
                     const filtroDescripcion = filtroTipo === 'all' 
                         ? '🌍 **Todas las tribus** - Se mostrarán conquistas de todas las tribus'
@@ -313,7 +323,7 @@ module.exports = {
                             `🟢 **Canal de ganancias:** ${config.gainsChannelId ? `<#${config.gainsChannelId}>` : 'No configurado'}`,
                             `🔴 **Canal de pérdidas:** ${config.lossesChannelId ? `<#${config.lossesChannelId}>` : 'No configurado'}`,
                             '',
-                            config.enabled ? '✅ **Estado:** Monitoreo activo con nuevo filtro' : '❌ **Estado:** Monitoreo desactivado',
+                            config.enabled ? '✅ **Estado:** Monitoreo reiniciado con nuevo filtro' : '❌ **Estado:** Monitoreo desactivado',
                             '',
                             '📋 **Explicación:**',
                             '• 🌍 **Todas las tribus**: Muestra conquistas de cualquier tribu',
@@ -362,6 +372,16 @@ module.exports = {
                     config.interval = modeConfig.interval;
                     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
                     
+                    // Reiniciar el monitor si está activo
+                    if (config.enabled && interaction.client.conquestMonitor) {
+                        console.log(`🔄 Reiniciando monitor con modo ${newMode} (${modeConfig.interval/1000}s)`);
+                        try {
+                            await interaction.client.conquestMonitor.restart();
+                        } catch (error) {
+                            console.error('❌ Error reiniciando monitor:', error);
+                        }
+                    }
+                    
                     embed.setColor('#00aaff')
                         .setDescription([
                             `${modeConfig.emoji} **Modo cambiado a: ${modeConfig.name}**`,
@@ -372,7 +392,7 @@ module.exports = {
                             `🟢 **Canal de ganancias:** ${config.gainsChannelId ? `<#${config.gainsChannelId}>` : 'No configurado'}`,
                             `🔴 **Canal de pérdidas:** ${config.lossesChannelId ? `<#${config.lossesChannelId}>` : 'No configurado'}`,
                             '',
-                            config.enabled ? '✅ **Estado:** Monitoreo activo con nuevo intervalo' : '❌ **Estado:** Monitoreo desactivado',
+                            config.enabled ? '✅ **Estado:** Monitoreo reiniciado con nuevo intervalo' : '❌ **Estado:** Monitoreo desactivado',
                             '',
                             '🎯 **Modos disponibles:**',
                             '• ⚡ **Intensivo (15s)** - Para guerra activa',

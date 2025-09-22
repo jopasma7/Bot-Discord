@@ -65,6 +65,15 @@ class ConquestAutoMonitor {
     }
 
     /**
+     * Reinicia el sistema con nueva configuración
+     */
+    async restart() {
+        console.log('[ConquestMonitor] 🔄 Reiniciando sistema con nueva configuración...');
+        this.stop();
+        await this.start();
+    }
+
+    /**
      * Carga la configuración desde el archivo
      */
     async loadConfig() {
@@ -115,13 +124,19 @@ class ConquestAutoMonitor {
             console.log(`⏰ LastCheck: ${lastCheck} (${new Date(lastCheck)})`);
             console.log(`🔍 Buscando conquistas más recientes que timestamp: ${Math.floor(lastCheck / 1000)}`);
 
+            // Leer configuración de filtros de tribu
+            const showAllTribes = !config.tribeFilter || config.tribeFilter.type === 'all';
+            const specificTribe = config.tribeFilter?.type === 'specific' ? config.tribeFilter.specificTribe : null;
+            
+            console.log(`🎯 Filtro configurado: ${showAllTribes ? 'TODAS las tribus' : `Solo tribu "${specificTribe}"`}`);
+
             // Analizar conquistas relevantes
             const relevantConquests = await this.analyzer.analyzeConquests(
                 conquests,
                 config.tribeId,
                 Math.floor(lastCheck / 1000),
-                false, // No mostrar todas
-                null   // Sin filtro específico
+                showAllTribes, // Usar configuración del comando
+                specificTribe  // Usar tribu específica del comando
             );
 
             console.log(`🎯 Análisis completado: ${relevantConquests.length} conquistas relevantes encontradas`);

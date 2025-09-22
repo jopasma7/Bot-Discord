@@ -121,14 +121,33 @@ class HybridConquestAnalyzer {
      * Aplica filtros específicos de tribus
      */
     applyTribeFilter(conquest, tribeFilter, targetTribeId) {
-        if (tribeFilter.type === 'all') {
+        console.log(`🔍 [Filter] Aplicando filtro: ${tribeFilter} a conquista de ${conquest.villageName}`);
+        
+        // Si el filtro es para mostrar todas las tribus
+        if (tribeFilter === 'all' || (typeof tribeFilter === 'object' && tribeFilter.type === 'all')) {
+            console.log(`🌍 [Filter] Mostrando TODAS las tribus`);
             return {
                 isRelevant: true,
                 type: this.determineConquestType(conquest, targetTribeId)
             };
         }
         
-        // Otros tipos de filtros se pueden implementar aquí
+        // Si el filtro es para una tribu específica
+        if (typeof tribeFilter === 'string') {
+            const targetTribe = tribeFilter;
+            console.log(`🏰 [Filter] Filtrando por tribu específica: "${targetTribe}"`);
+            
+            // Verificar si alguna de las tribus involucradas coincide
+            if (conquest.oldOwner?.tribe === targetTribe || conquest.newOwner?.tribe === targetTribe) {
+                console.log(`✅ [Filter] Conquista relevante para tribu "${targetTribe}"`);
+                return {
+                    isRelevant: true,
+                    type: this.determineConquestType(conquest, targetTribeId)
+                };
+            }
+        }
+        
+        console.log(`❌ [Filter] Conquista no relevante para el filtro configurado`);
         return { isRelevant: false, type: null };
     }
     
