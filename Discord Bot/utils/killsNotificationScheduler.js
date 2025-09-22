@@ -38,9 +38,9 @@ class KillsNotificationScheduler {
         console.log('[NotificationScheduler] ✅ Sistema de notificaciones iniciado');
         console.log('[NotificationScheduler] ⏰ Verificaciones programadas cada 2 horas en punto');
 
-        // Ejecutar una verificación inicial después de 1 minuto (sin forzar descarga)
+        // Ejecutar una verificación inicial inmediatamente (carga desde archivos locales si existen)
         setTimeout(async () => {
-            console.log('[NotificationScheduler] 🔄 Ejecutando verificación inicial (carga desde archivos locales si existen)...');
+            console.log('[NotificationScheduler] 🔄 Ejecutando verificación inicial inmediata (carga desde archivos locales si existen)...');
             
             const config = await this.loadConfig();
             for (const [guildId, guildConfig] of Object.entries(config)) {
@@ -48,7 +48,7 @@ class KillsNotificationScheduler {
                     await this.sendNotificationToGuild(guildId, guildConfig, false); // Sin forzar descarga
                 }
             }
-        }, 60000);
+        }, 1000); // Cambiar de 60000 (1 minuto) a 1000 (1 segundo)
     }
 
     /**

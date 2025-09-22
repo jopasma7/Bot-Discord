@@ -30,16 +30,18 @@ class VillageActivityAnalyzer {
     }
 
     /**
-     * Obtiene el historial de actividad de una aldea desde TWStats
+     * Obtiene el historial de actividad de una aldea desde TWStats con reintento
      */
-    async getVillageHistory(villageId) {
+    async getVillageHistory(villageId, retryCount = 0) {
+        const maxRetries = 2; // Máximo 2 reintentos
+        
         try {
             const villageUrl = `${this.twstatsBaseUrl}/index.php?page=village&id=${villageId}`;
-            console.log(`[ActivityAnalyzer] Obteniendo historial de aldea ID: ${villageId}`);
+            console.log(`[ActivityAnalyzer] Obteniendo historial de aldea ID: ${villageId}${retryCount > 0 ? ` (intento ${retryCount + 1}/${maxRetries + 1})` : ''}`);
             
             // Crear un AbortController para timeout
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos (aumentado de 10)
             
             const response = await fetch(villageUrl, {
                 headers: {
@@ -70,10 +72,17 @@ class VillageActivityAnalyzer {
         } catch (error) {
             console.error(`[ActivityAnalyzer] Error obteniendo historial para village ${villageId}:`, error);
             
+            // Lógica de reintento para timeouts
+            if ((error.name === 'AbortError' || error.message.includes('timeout')) && retryCount < maxRetries) {
+                console.log(`[ActivityAnalyzer] Reintentando en 3 segundos... (${retryCount + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Esperar 3 segundos
+                return this.getVillageHistory(villageId, retryCount + 1);
+            }
+            
             // Crear un mensaje de error más específico según el tipo de error
             let errorMessage = 'Error desconocido';
             if (error.name === 'AbortError') {
-                errorMessage = 'Timeout: TWStats tardó demasiado en responder';
+                errorMessage = 'Timeout: TWStats tardó demasiado en responder (incluso después de reintentos)';
             } else if (error.message.includes('HTTP')) {
                 errorMessage = `TWStats respondió con error ${error.message}`;
             } else if (error.message.includes('fetch') || error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
@@ -148,53 +157,66 @@ class VillageActivityAnalyzer {
             // Buscar la tabla del historial
             const tableMatch = html.match(/<table[^>]*>[\s\S]*?<\/table>/gi);
             
-            if (!tableMatch) {
-                console.log('[ActivityAnalyzer] No se encontró ninguna tabla en el HTML');
-                return history;
-            }
-
-            console.log(`[ActivityAnalyzer] Encontradas ${tableMatch.length} tablas en total`);
-
-            // Buscar la tabla que contiene el historial (normalmente la más grande)
-            let historyTable = '';
-            let tableIndex = -1;
-            
-            for (let i = 0; i < tableMatch.length; i++) {
-                const table = tableMatch[i];
-                console.log(`[ActivityAnalyzer] Tabla ${i}: contiene fecha 2025? ${table.includes('2025-')}, contiene +? ${table.includes('+')}`);
-                
-                if (table.includes('2025-') && table.includes('+')) {
-                    historyTable = table;
                     tableIndex = i;
-                    break;
-                }
-            }
-
-            if (!historyTable) {
-                console.log('[ActivityAnalyzer] No se encontró tabla de historial válida con fechas 2025 y símbolo +');
                 
-                // Buscar solo por fechas 2025 como fallback
-                for (let i = 0; i < tableMatch.length; i++) {
-                    const table = tableMatch[i];
-                    if (table.includes('2025-')) {
-                        console.log(`[ActivityAnalyzer] Encontrada tabla con fechas 2025 (fallback): tabla ${i}`);
-                        historyTable = table;
-                        tableIndex = i;
-                        break;
+            const info = {
+                name: 'Desconocida',
+                owner: 'Desconocido',
+                tribe: null,
+                points: 0,
+                coordinates: { x: 0, y: 0 }
+            };
+
+            try {
+                // Extraer nombre de la aldea
+                const nameMatch = html.match(/<h2[^>]*>([^<]+)</);
+                if (nameMatch) {
+                    info.name = nameMatch[1].trim();
+                }
+
+                // Extraer propietario (más tolerante, acepta "-", "Bárbaros", etc)
+                let ownerMatch = html.match(/Propietario[^:]*:?\s*<[^>]*>([^<]*)</i);
+                if (ownerMatch) {
+                    let owner = ownerMatch[1].trim();
+                    if (owner === '-' || owner === '' || owner.toLowerCase().includes('bárbar')) {
+                        info.owner = 'Bárbaros';
+                    } else {
+                        info.owner = owner;
                     }
                 }
+
+                // Extraer tribu si existe
+                const tribeMatch = html.match(/Tribu[^:]*:?\s*<[^>]*>([^<]*)</i);
+                if (tribeMatch && tribeMatch[1].trim() !== '-' && tribeMatch[1].trim() !== '') {
+                    info.tribe = tribeMatch[1].trim();
+                }
+
+                // Extraer puntos (más tolerante, acepta "0 puntos", "- puntos", etc)
+                let pointsMatch = html.match(/([\d.,]+)\s*puntos/i);
+                if (pointsMatch) {
+                    info.points = parseInt(pointsMatch[1].replace(/[,\.]/g, ''));
+                } else {
+                    // Si no hay puntos, buscar "0 puntos" o similar
+                    if (html.includes('0 puntos')) info.points = 0;
+                }
+
+                // Extraer coordenadas
+                const coordMatch = html.match(/(\d{1,3})\|(\d{1,3})/);
+                if (coordMatch) {
+                    info.coordinates.x = parseInt(coordMatch[1]);
+                    info.coordinates.y = parseInt(coordMatch[2]);
+                }
+
+                // Log extra si no se encuentra propietario o puntos
+                if (info.owner === 'Desconocido' || info.points === 0) {
+                    console.warn('[ActivityAnalyzer] Propietario o puntos no detectados. Fragmento HTML:', html.substring(0, 500));
+                }
+
+            } catch (error) {
+                console.error('[ActivityAnalyzer] Error parseando info básica:', error);
             }
 
-            if (!historyTable) {
-                console.log('[ActivityAnalyzer] No se encontró tabla con fechas válidas');
-                return history;
-            }
-
-            console.log(`[ActivityAnalyzer] Usando tabla ${tableIndex} para análisis de historial`);
-
-            // Extraer filas de la tabla
-            const rowMatches = historyTable.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
-            console.log(`[ActivityAnalyzer] Encontradas ${rowMatches.length} filas en la tabla de historial`);
+            return info;
             
             for (let i = 0; i < rowMatches.length; i++) {
                 const row = rowMatches[i];

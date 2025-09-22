@@ -38,6 +38,24 @@ class ConquestAutoMonitor {
         console.log(`📊 Modo detectado: ${config.mode} (${config.interval/1000}s)`);
         console.log(`⏱️ Monitoreo configurado cada ${config.interval/1000} segundos`);
 
+        // ⚠️ IMPORTANTE: Evitar envío de conquistas históricas al iniciar
+        const now = Date.now();
+        const timeSinceLastCheck = now - (config.lastCheck || 0);
+        const ONE_HOUR = 60 * 60 * 1000; // 1 hora en ms
+
+        // Si es primera vez o ha pasado más de 1 hora, establecer lastCheck al momento actual
+        if (!config.lastCheck || timeSinceLastCheck > ONE_HOUR) {
+            console.log(`⏰ Actualizando lastCheck para evitar conquistas históricas`);
+            console.log(`   - Último check: ${config.lastCheck ? new Date(config.lastCheck) : 'Nunca'}`);
+            console.log(`   - Tiempo transcurrido: ${Math.round(timeSinceLastCheck / 1000 / 60)} minutos`);
+            
+            config.lastCheck = now;
+            await this.saveConfig(config);
+            console.log(`✅ LastCheck actualizado a: ${new Date(now)}`);
+        } else {
+            console.log(`⏰ LastCheck válido: ${new Date(config.lastCheck)}`);
+        }
+
         // Iniciar monitoreo con el intervalo configurado
         this.monitoringInterval = setInterval(async () => {
             await this.checkConquests();
@@ -45,6 +63,9 @@ class ConquestAutoMonitor {
 
         this.isRunning = true;
         console.log('✅ Sistema de monitoreo de conquistas iniciado correctamente');
+
+        // Enviar notificación de inicio
+        await this.sendStartupNotification(config);
 
         // Ejecutar verificación inicial después de 10 segundos
         setTimeout(() => {
@@ -98,6 +119,49 @@ class ConquestAutoMonitor {
     }
 
     /**
+     * Envía notificación de inicio del sistema
+     */
+    async sendStartupNotification(config) {
+        try {
+            const channels = await this.getChannels(config);
+            if (!channels.gainsChannel) {
+                console.log('[ConquestMonitor] No se pudo obtener canal para notificación de inicio');
+                return;
+            }
+
+            const startupEmbed = new EmbedBuilder()
+                .setColor('#00FF00')
+                .setTitle('🚨 Sistema de Monitoreo Iniciado')
+                .setDescription('El sistema de monitoreo de conquistas se ha iniciado correctamente')
+                .addFields([
+                    {
+                        name: '⏱️ Intervalo de verificación',
+                        value: `${config.interval / 1000} segundos`,
+                        inline: true
+                    },
+                    {
+                        name: '🎯 Filtro de tribus',
+                        value: config.tribeFilter?.type === 'all' ? 'Todas las tribus' : `Tribu específica: ${config.tribeFilter?.specificTribe || 'No definida'}`,
+                        inline: true
+                    },
+                    {
+                        name: '📊 Estado',
+                        value: 'Activo y monitoreando',
+                        inline: true
+                    }
+                ])
+                .setTimestamp()
+                .setFooter({ text: 'Monitoreo de Conquistas - GT Bot' });
+
+            await channels.gainsChannel.send({ embeds: [startupEmbed] });
+            console.log('✅ Notificación de inicio enviada al canal de conquistas');
+
+        } catch (error) {
+            console.error('[ConquestMonitor] Error enviando notificación de inicio:', error);
+        }
+    }
+
+    /**
      * Verifica conquistas y envía notificaciones
      */
     async checkConquests() {
@@ -121,8 +185,12 @@ class ConquestAutoMonitor {
 
             // Filtrar conquistas desde el último check
             const lastCheck = config.lastCheck || 0;
-            console.log(`⏰ LastCheck: ${lastCheck} (${new Date(lastCheck)})`);
-            console.log(`🔍 Buscando conquistas más recientes que timestamp: ${Math.floor(lastCheck / 1000)}`);
+            const lastCheckDate = new Date(lastCheck);
+            const currentTime = new Date();
+            
+            console.log(`⏰ LastCheck: ${lastCheck} (${lastCheckDate.toLocaleString()})`);
+            console.log(`🕒 Hora actual: ${currentTime.toLocaleString()}`);
+            console.log(`🔍 Buscando conquistas posteriores a: ${lastCheckDate.toLocaleString()}`);
 
             // Leer configuración de filtros de tribu
             const showAllTribes = !config.tribeFilter || config.tribeFilter.type === 'all';
@@ -134,12 +202,26 @@ class ConquestAutoMonitor {
             const relevantConquests = await this.analyzer.analyzeConquests(
                 conquests,
                 config.tribeId,
-                Math.floor(lastCheck / 1000),
-                showAllTribes, // Usar configuración del comando
-                specificTribe  // Usar tribu específica del comando
+                Math.floor(lastCheck / 1000), // Convertir a timestamp Unix
+                showAllTribes,
+                specificTribe
             );
 
             console.log(`🎯 Análisis completado: ${relevantConquests.length} conquistas relevantes encontradas`);
+
+            // Log detallado de las conquistas encontradas
+            if (relevantConquests.length > 0) {
+                console.log('📋 Lista de conquistas relevantes:');
+                relevantConquests.slice(0, 5).forEach((conquest, index) => {
+                    const conquestDate = new Date(conquest.timestamp * 1000);
+                    console.log(`   ${index + 1}. ${conquest.villageName} - ${conquestDate.toLocaleString()}`);
+                });
+                if (relevantConquests.length > 5) {
+                    console.log(`   ... y ${relevantConquests.length - 5} más`);
+                }
+            } else {
+                console.log('📋 No hay conquistas nuevas que procesar');
+            }
 
             if (relevantConquests.length > 0) {
                 console.log(`🎯 Encontradas ${relevantConquests.length} conquistas relevantes`);
@@ -152,11 +234,15 @@ class ConquestAutoMonitor {
                 } else {
                     console.log('❌ Error obteniendo canales de Discord');
                 }
+            } else {
+                console.log('ℹ️  No hay conquistas nuevas para enviar');
             }
 
-            // Actualizar timestamp del último check
-            config.lastCheck = Date.now();
+            // Actualizar timestamp del último check al momento actual
+            const newLastCheck = Date.now();
+            config.lastCheck = newLastCheck;
             await this.saveConfig(config);
+            console.log(`⏰ LastCheck actualizado a: ${new Date(newLastCheck).toLocaleString()}`);
 
             // Limpiar conquistas procesadas antiguas
             this.analyzer.cleanOldProcessedConquests();

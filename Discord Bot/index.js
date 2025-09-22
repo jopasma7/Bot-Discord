@@ -112,10 +112,182 @@ client.on('interactionCreate', async interaction => {
         const [_, x, y] = interaction.customId.split('_');
         console.log(`🔍 [Button] Análisis solicitado para ${x}|${y} por ${interaction.user.username}`);
         
-        await interaction.reply({
-            content: `📊 **Análisis detallado de ${x}|${y}**\n\n🚧 **En desarrollo** - Esta función estará disponible pronto.\n\nIncluirá:\n• 📈 Historial de actividad\n• 🏗️ Edificios y niveles\n• ⚔️ Actividad militar\n• 📊 Estadísticas del jugador`,
-            ephemeral: true
-        });
+        await interaction.deferReply({ ephemeral: true });
+        
+        try {
+            console.log(`[ActivityAnalysis] Analizando coordenadas ${x}|${y}`);
+            
+            // Importar y usar el VillageActivityAnalyzer
+            const VillageActivityAnalyzer = require('./utils/villageActivityAnalyzer');
+            const analyzer = new VillageActivityAnalyzer();
+            
+            // Obtener ID de la aldea
+            const villageId = await analyzer.getVillageIdFromCoordinates(parseInt(x), parseInt(y));
+            
+            if (!villageId) {
+                await interaction.editReply({
+                    content: `❌ **No se encontró aldea en ${x}|${y}**\n\nLa coordenada podría estar vacía o no estar registrada en el sistema.`
+                });
+                return;
+            }
+            
+            console.log(`[ActivityAnalysis] Village ID encontrado: ${villageId}`);
+            
+            // Obtener historial de actividad
+            const data = await analyzer.getVillageHistory(villageId);
+            console.log(`[ActivityAnalysis] Datos obtenidos:`, {
+                name: data.name,
+                owner: data.owner,
+                historyLength: data.history?.length || 0
+            });
+            
+            // Analizar patrones
+            const analysis = analyzer.analyzeActivityPatterns(data.history, data.points);
+            
+            // Crear embed de respuesta detallado
+            const { EmbedBuilder } = require('discord.js');
+            const analysisEmbed = new EmbedBuilder()
+                .setColor('#FF6B35')
+                .setTitle(`📊 Análisis de Actividad: ${data.name}`)
+                .setDescription(`**Coordenadas:** ${x}|${y}\n**Propietario:** ${data.owner}${data.tribe ? `\n**Tribu:** ${data.tribe}` : ''}\n**Puntos:** ${data.points.toLocaleString()}`)
+                .addFields([
+                    {
+                        name: '� Zona Horaria Estimada',
+                        value: `**${analysis.timezone}**\n${analysis.pattern}\n*Confianza: ${analysis.confidence}*`,
+                        inline: false
+                    },
+                    {
+                        name: '📈 Datos del Análisis',
+                        value: `**Total registros:** ${analysis.totalEntries}\n**Registros confiables:** ${analysis.reliableEntries} (${analysis.reliabilityPercentage}%)\n**Nivel:** ${analysis.playerLevel === 'early_game' ? 'Jugador inicial' : 'Jugador avanzado'}`,
+                        inline: true
+                    },
+                    {
+                        name: '📅 Período Analizado',
+                        value: `**Desde:** ${analysis.analysisRange.from?.split(' ')[0] || 'N/A'}\n**Hasta:** ${analysis.analysisRange.to?.split(' ')[0] || 'N/A'}`,
+                        inline: true
+                    }
+                ])
+                .setTimestamp()
+                .setFooter({ text: 'Análisis basado en datos de TWStats' });
+            
+            // Agregar insights si existen
+            if (analysis.insights && analysis.insights.length > 0) {
+                const insightsText = analysis.insights.slice(0, 5).join('\n'); // Máximo 5 insights
+                analysisEmbed.addFields([
+                    {
+                        name: '💡 Insights',
+                        value: insightsText,
+                        inline: false
+                    }
+                ]);
+            }
+            
+            // Agregar actividad por horas si hay datos suficientes
+            if (analysis.hourlyActivity && analysis.totalEntries >= 10) {
+                const topHours = analysis.hourlyActivity
+                    .filter(h => h.percentage > 5) // Solo mostrar horas con >5% actividad
+                    .sort((a, b) => b.percentage - a.percentage)
+                    .slice(0, 8); // Top 8 horas
+                
+                if (topHours.length > 0) {
+                    const hoursText = topHours
+                        .map(h => `${h.hour}: ${h.percentage}% (${h.count})`)
+                        .join('\n');
+                    
+                    analysisEmbed.addFields([
+                        {
+                            name: '⏰ Horarios de Mayor Actividad',
+                            value: hoursText,
+                            inline: false
+                        }
+                    ]);
+                }
+            }
+            
+            // Advertencia si pocos datos
+            if (analysis.totalEntries < 10) {
+                analysisEmbed.setDescription(
+                    analysisEmbed.data.description + 
+                    '\n\n⚠️ **Pocos datos disponibles** - El análisis puede ser impreciso'
+                );
+            }
+            
+            await interaction.editReply({ 
+                embeds: [analysisEmbed] 
+            });
+            
+        } catch (error) {
+            console.error('[ActivityAnalysis] Error:', error);
+            
+            let errorMessage = '❌ **Error en el análisis**\n\n';
+            let errorEmbed = null;
+            
+            if (error.message.includes('Timeout') && error.message.includes('TWStats')) {
+                // Error específico de timeout con TWStats
+                errorEmbed = new EmbedBuilder()
+                    .setColor('#FF6B35')
+                    .setTitle('⏳ Timeout de Análisis')
+                    .setDescription(`**Coordenadas:** ${x}|${y}`)
+                    .addFields([
+                        {
+                            name: '🔴 Problema',
+                            value: 'TWStats tardó demasiado en responder (>30 segundos)',
+                            inline: false
+                        },
+                        {
+                            name: '🔄 Reintentos',
+                            value: 'Se intentó 3 veces automáticamente',
+                            inline: true
+                        },
+                        {
+                            name: '💡 Solución',
+                            value: 'Inténtalo de nuevo en unos minutos',
+                            inline: true
+                        }
+                    ])
+                    .setFooter({ text: 'TWStats puede estar sobrecargado' })
+                    .setTimestamp();
+                    
+            } else if (error.message.includes('TWStats') || error.message.includes('no disponible')) {
+                // Error de conectividad con TWStats
+                errorEmbed = new EmbedBuilder()
+                    .setColor('#FF0000')
+                    .setTitle('🚫 Servidor No Disponible')
+                    .setDescription(`**Coordenadas:** ${x}|${y}`)
+                    .addFields([
+                        {
+                            name: '🔴 Problema',
+                            value: 'No se puede conectar con TWStats',
+                            inline: false
+                        },
+                        {
+                            name: '🕒 Estado',
+                            value: 'Servidor temporalmente no disponible',
+                            inline: true
+                        },
+                        {
+                            name: '💡 Solución',
+                            value: 'Inténtalo más tarde',
+                            inline: true
+                        }
+                    ])
+                    .setFooter({ text: 'Problema temporal del servidor TWStats' })
+                    .setTimestamp();
+                    
+            } else if (error.message.includes('No se encontró')) {
+                // Aldea no encontrada
+                errorMessage += error.message;
+            } else {
+                // Error genérico
+                errorMessage += `Error interno del sistema.\n\n**Detalles técnicos:**\n\`\`\`${error.message}\`\`\`\n\n💡 Inténtalo de nuevo en unos minutos.`;
+                console.error('[ActivityAnalysis] Error completo:', error);
+            }
+            
+            await interaction.editReply(
+                errorEmbed ? { embeds: [errorEmbed] } : { content: errorMessage }
+            );
+        }
+        
         return;
     }
     
