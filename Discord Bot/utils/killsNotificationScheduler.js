@@ -131,8 +131,24 @@ class KillsNotificationScheduler {
             const embeds = await this.createNotificationEmbeds(result);
             
             // Enviar embeds al canal
+            const sentMessages = [];
             for (const embed of embeds) {
-                await channel.send({ embeds: [embed] });
+                const message = await channel.send({ embeds: [embed] });
+                sentMessages.push(message);
+            }
+
+            // Si no hay cambios, programar eliminación automática después de 1 hora
+            if (!result.summary.hasChanges || result.summary.totalPlayers === 0) {
+                setTimeout(async () => {
+                    try {
+                        for (const message of sentMessages) {
+                            await message.delete();
+                            console.log(`[NotificationScheduler] 🗑️ Mensaje "sin cambios" eliminado automáticamente`);
+                        }
+                    } catch (error) {
+                        console.error(`[NotificationScheduler] Error eliminando mensaje automáticamente:`, error);
+                    }
+                }, 60 * 60 * 1000); // 1 hora
             }
 
             if (result.summary.hasChanges) {
@@ -152,6 +168,11 @@ class KillsNotificationScheduler {
     async createNotificationEmbeds(result) {
         const embeds = [];
         const { changes, summary } = result;
+
+        // Si no hay cambios, crear embed elegante especial
+        if (!summary.hasChanges || summary.totalPlayers === 0) {
+            return this.createNoChangesEmbed();
+        }
 
         // Calcular porcentajes para las barras (evitar división por 0)
         const total = summary.totals?.all || 0;
@@ -309,6 +330,61 @@ class KillsNotificationScheduler {
         }
 
         return embeds;
+    }
+
+    /**
+     * Crea un embed elegante cuando no hay cambios
+     */
+    createNoChangesEmbed() {
+        const currentTime = new Date();
+        const nextCheckTime = new Date(currentTime.getTime() + 2 * 60 * 60 * 1000); // +2 horas
+        const timeString = nextCheckTime.toLocaleTimeString('es-ES', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+
+        // Mensajes aleatorios para variedad
+        const calmMessages = [
+            '✨ **Todo tranquilo en el frente**',
+            '🌟 **Momento de calma en el campo de batalla**',
+            '🕊️ **Paz temporal en el mundo**',
+            '🌙 **Los guerreros descansan**'
+        ];
+        
+        const randomMessage = calmMessages[Math.floor(Math.random() * calmMessages.length)];
+
+        const embed = new EmbedBuilder()
+            .setColor('#2E8B57') // Verde elegante
+            .setTitle('🌙 Período de Calma')
+            .setDescription(
+                randomMessage + '\n\n' +
+                '🛡️ **Los miembros de la tribu están descansando**\n' +
+                '⚔️ **Sin actividad de combate detectada**\n' +
+                '📊 **Sistema de monitoreo activo**'
+            )
+            .addFields(
+                {
+                    name: '🎯 Estado Actual',
+                    value: '🟢 **Sistema Operativo** • Vigilancia continua',
+                    inline: true
+                },
+                {
+                    name: '⏰ Próxima Verificación',
+                    value: `🔄 **${timeString}** (en ~2h)`,
+                    inline: true
+                },
+                {
+                    name: '� Actividad Reciente',
+                    value: '� Sin nuevos adversarios ganados',
+                    inline: false
+                }
+            )
+            .setFooter({ 
+                text: 'GT ES95 • Este mensaje se eliminará automáticamente en 1 hora',
+            })
+            .setTimestamp();
+
+        return [embed];
     }
 
     /**
