@@ -6,6 +6,9 @@ require('dotenv').config();
 // Cargar configuración de servidores permitidos
 const serverConfig = JSON.parse(fs.readFileSync('server-config.json', 'utf8'));
 
+// Importar sistemas automáticos
+const KillsNotificationScheduler = require('./utils/killsNotificationScheduler');
+
 // Crear el cliente del bot
 const client = new Client({
     intents: [
@@ -31,6 +34,24 @@ for (const file of commandFiles) {
         console.log(`📝 Comando cargado: ${command.data.name}`);
     } else {
         console.log(`⚠️ El comando en ${filePath} no tiene "data" o "execute"`);
+    }
+}
+
+// Función para inicializar sistemas automáticos
+async function initializeAutomaticSystems(client) {
+    console.log('🚀 Inicializando sistemas automáticos...');
+    
+    try {
+        // Sistema de notificaciones de adversarios (kills)
+        console.log('🏆 Iniciando sistema de notificaciones de adversarios...');
+        const killsScheduler = new KillsNotificationScheduler(client);
+        await killsScheduler.start();
+        console.log('✅ Sistema de notificaciones de adversarios iniciado correctamente');
+        
+        console.log('✅ Sistemas automáticos iniciados correctamente');
+        
+    } catch (error) {
+        console.error('❌ Error inicializando sistemas automáticos:', error);
     }
 }
 
@@ -63,6 +84,9 @@ client.once('clientReady', async () => {
     }
     
     console.log(`🎯 Verificación de servidores completada. Continuando inicialización...`);
+    
+    // Inicializar sistemas automáticos
+    await initializeAutomaticSystems(client);
     
     // Estado del bot
     client.user.setActivity('Guerras Tribales 🏰', { type: 3 }); // 3 = WATCHING
