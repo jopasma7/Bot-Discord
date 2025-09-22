@@ -105,8 +105,21 @@ client.once('clientReady', async () => {
     console.log(`✅ Bot completamente inicializado y listo para funcionar`);
 });
 
-// Manejar comandos slash
+// Manejar comandos slash y botones
 client.on('interactionCreate', async interaction => {
+    // Manejar botones de coordenadas
+    if (interaction.isButton() && interaction.customId.startsWith('analyze_')) {
+        const [_, x, y] = interaction.customId.split('_');
+        console.log(`🔍 [Button] Análisis solicitado para ${x}|${y} por ${interaction.user.username}`);
+        
+        await interaction.reply({
+            content: `📊 **Análisis detallado de ${x}|${y}**\n\n🚧 **En desarrollo** - Esta función estará disponible pronto.\n\nIncluirá:\n• 📈 Historial de actividad\n• 🏗️ Edificios y niveles\n• ⚔️ Actividad militar\n• 📊 Estadísticas del jugador`,
+            ephemeral: true
+        });
+        return;
+    }
+    
+    // Manejar comandos slash
     if (!interaction.isChatInputCommand()) return;
 
     // Verificar si el servidor está autorizado
@@ -137,10 +150,29 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// Manejar mensajes normales (comandos con prefijo)
+// Manejar mensajes normales (comandos con prefijo y detección de coordenadas)
 client.on('messageCreate', async message => {
-    // Ignorar bots y mensajes sin prefijo
+    // Ignorar mensajes de bots
     if (message.author.bot) return;
+
+    console.log(`📝 [Message] Usuario: ${message.author.username} en canal: ${message.channel.name}`);
+    console.log(`📝 [Message] Contenido: "${message.content}"`);
+
+    // Verificar detección de coordenadas PRIMERO (antes que comandos)
+    const coordinateRegex = /\b(\d{1,3})[\|\-,\s](\d{1,3})\b/g;
+    const matches = [...message.content.matchAll(coordinateRegex)];
+    
+    console.log(`🔍 [Coordinates] Regex matches:`, matches);
+    
+    if (matches.length > 0) {
+        console.log(`✅ [Coordinates] Coordenadas detectadas: ${matches.map(m => m[0])}`);
+        await handleCoordinateMessage(message, matches);
+        return; // Salir después de manejar coordenadas
+    } else {
+        console.log(`❌ [Coordinates] No se detectaron coordenadas en: "${message.content}"`);
+    }
+
+    // Manejar comandos con prefijo !gt
     if (!message.content.startsWith('!gt')) return;
 
     const args = message.content.slice(3).trim().split(/ +/);
@@ -168,6 +200,66 @@ client.on('messageCreate', async message => {
         `);
     }
 });
+
+// Función para manejar mensajes con coordenadas
+async function handleCoordinateMessage(message, matches) {
+    try {
+        console.log(`🎯 [Coordinates] Procesando coordenadas para: ${message.author.username}`);
+        
+        // Procesar la primera coordenada encontrada
+        const match = matches[0];
+        const x = parseInt(match[1]);
+        const y = parseInt(match[2]);
+        
+        console.log(`📍 [Coordinates] Coordenadas procesadas: ${x}|${y}`);
+        
+        // Validar rango de coordenadas
+        if (x < 1 || x > 1000 || y < 1 || y > 1000) {
+            console.log(`⚠️ [Coordinates] Coordenadas fuera de rango: ${x}|${y}`);
+            return;
+        }
+        
+        // Crear el embed de respuesta
+        const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+        
+        const embed = new EmbedBuilder()
+            .setColor('#ffd700')
+            .setTitle('🏘️ Información de Aldea')
+            .addFields(
+                { name: '📍 Coordenadas', value: `${x}|${y}`, inline: true },
+                { name: '🔍 Estado', value: 'Obteniendo datos...', inline: true }
+            )
+            .setFooter({ text: 'GT ES95 • Sistema de Coordenadas' })
+            .setTimestamp();
+        
+        // Crear botones
+        const gameUrl = `https://es95.guerrastribales.es/game.php?village=914&screen=info_village&id=2528#${x};${y}`;
+        
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('🌍 Ver en juego')
+                    .setURL(gameUrl)
+                    .setStyle(ButtonStyle.Link),
+                new ButtonBuilder()
+                    .setCustomId(`analyze_${x}_${y}`)
+                    .setLabel('📊 Análisis detallado')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+        
+        // Responder al mensaje
+        await message.reply({
+            embeds: [embed],
+            components: [row]
+        });
+        
+        console.log(`✅ [Coordinates] Respuesta enviada para ${x}|${y}`);
+        
+    } catch (error) {
+        console.error('❌ [Coordinates] Error procesando coordenadas:', error);
+        await message.reply('❌ Error procesando las coordenadas.');
+    }
+}
 
 // Evento cuando el bot es agregado a un nuevo servidor
 client.on('guildCreate', async guild => {
