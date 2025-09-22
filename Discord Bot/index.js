@@ -8,6 +8,7 @@ const serverConfig = JSON.parse(fs.readFileSync('server-config.json', 'utf8'));
 
 // Importar sistemas automáticos
 const KillsNotificationScheduler = require('./utils/killsNotificationScheduler');
+const ConquestAutoMonitor = require('./conquest-auto-monitor');
 
 // Crear el cliente del bot
 const client = new Client({
@@ -47,6 +48,12 @@ async function initializeAutomaticSystems(client) {
         const killsScheduler = new KillsNotificationScheduler(client);
         await killsScheduler.start();
         console.log('✅ Sistema de notificaciones de adversarios iniciado correctamente');
+        
+        // Sistema de monitoreo de conquistas
+        console.log('🏰 Iniciando sistema de monitoreo de conquistas...');
+        const conquestMonitor = new ConquestAutoMonitor(client);
+        await conquestMonitor.start();
+        console.log('✅ Sistema de monitoreo de conquistas iniciado correctamente');
         
         console.log('✅ Sistemas automáticos iniciados correctamente');
         
