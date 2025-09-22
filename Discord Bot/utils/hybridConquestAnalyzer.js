@@ -26,7 +26,7 @@ class HybridConquestAnalyzer {
     async analyzeConquests(conquests, targetTribeId, sinceTimestamp = 0, showAllConquests = false, tribeFilter = null) {
         console.log(`🔍 [Analyzer] Analizando ${conquests.length} conquistas`);
         console.log(`📅 [Analyzer] Filtrar desde: ${new Date(sinceTimestamp * 1000)}`);
-        console.log(`🌍 [Analyzer] Mostrar todas: ${showAllConquests}`);
+        console.log(`🌍 [Analyzer] Configuración: showAllConquests=${showAllConquests}, tribeFilter=${JSON.stringify(tribeFilter)}`);
         
         const relevantConquests = [];
         
@@ -42,41 +42,19 @@ class HybridConquestAnalyzer {
                 continue;
             }
             
-            let isRelevant = false;
-            let conquestType = null;
+            // Determinar qué tipo de conquista es respecto a Bollo
+            const bolloType = this.determineConquestType(conquest, targetTribeId);
             
-            // Determinar si la conquista es relevante
-            if (showAllConquests) {
-                // Mostrar TODAS las conquistas del mundo
-                isRelevant = true;
-                conquestType = this.determineConquestType(conquest, targetTribeId);
-            } else if (tribeFilter) {
-                // Aplicar filtro específico de tribus
-                const filterResult = this.applyTribeFilter(conquest, tribeFilter, targetTribeId);
-                isRelevant = filterResult.isRelevant;
-                conquestType = filterResult.type;
-            } else {
-                // Solo conquistas que involucran a la tribu objetivo
-                const tribeResult = this.checkTargetTribeInvolvement(conquest, targetTribeId);
-                isRelevant = tribeResult.isRelevant;
-                conquestType = tribeResult.type;
-            }
+            // Procesar según la configuración de filtros
+            const processedConquests = this.processConquestByFilter(conquest, bolloType, tribeFilter);
             
-            if (isRelevant) {
-                // Verificar que la conquista tiene datos válidos
-                if (!conquest || !conquest.villageName) {
-                    console.warn(`⚠️ [Analyzer] Conquista con datos incompletos ignorada:`, conquest);
-                    continue;
+            // Agregar conquistas procesadas
+            for (const processedConquest of processedConquests) {
+                if (processedConquest && processedConquest.villageName) {
+                    relevantConquests.push(processedConquest);
+                    this.processedConquests.add(conquestKey);
+                    console.log(`✅ [Analyzer] ${processedConquest.type}: ${processedConquest.villageName} por ${processedConquest.newOwner.name}`);
                 }
-                
-                // Crear objeto de conquista unificado
-                const processedConquest = this.createUnifiedConquest(conquest, conquestType);
-                relevantConquests.push(processedConquest);
-                
-                // Marcar como procesada
-                this.processedConquests.add(conquestKey);
-                
-                console.log(`✅ [Analyzer] ${conquestType}: ${processedConquest.villageName} por ${processedConquest.newOwner.name}`);
             }
         }
         
@@ -84,6 +62,67 @@ class HybridConquestAnalyzer {
         return relevantConquests;
     }
     
+    /**
+     * Procesa una conquista según el filtro configurado
+     * Retorna array de conquistas procesadas (puede ser 0, 1 o 2 conquistas)
+     */
+    processConquestByFilter(conquest, bolloType, tribeFilter) {
+        const results = [];
+        
+        // Determinar configuración del filtro
+        const isAllTribes = !tribeFilter || tribeFilter.type === 'all';
+        const specificTribe = tribeFilter?.type === 'specific' ? tribeFilter.specificTribe : null;
+        
+        console.log(`🔍 [Filter] Procesando: ${conquest.villageName} | BolloType: ${bolloType} | Filtro: ${isAllTribes ? 'TODAS' : specificTribe}`);
+        
+        if (isAllTribes) {
+            // FILTRO: "Todas las tribus"
+            // Canal GAIN: TODAS las conquistas del mundo
+            // Canal LOSS: Solo pérdidas de Bollo
+            
+            if (bolloType === 'LOSS') {
+                // Pérdida de Bollo → Canal LOSS
+                results.push(this.createUnifiedConquest(conquest, 'LOSS'));
+                console.log(`🔴 [Filter] → Canal LOSS (pérdida de Bollo)`);
+            }
+            
+            // TODAS las conquistas → Canal GAIN (como información general)
+            // Pero marcamos diferente las que no son de Bollo
+            const gainType = bolloType === 'GAIN' ? 'GAIN' : 'GAIN_INFO';
+            results.push(this.createUnifiedConquest(conquest, gainType));
+            console.log(`🟢 [Filter] → Canal GAIN (${gainType})`);
+            
+        } else if (specificTribe) {
+            // FILTRO: "Tribu específica"
+            // Canal GAIN: Solo conquistas de la tribu específica
+            // Canal LOSS: Pérdidas de Bollo + pérdidas de tribu específica
+            
+            const involvesSpecificTribe = conquest.oldOwner?.tribe === specificTribe || conquest.newOwner?.tribe === specificTribe;
+            
+            if (bolloType === 'LOSS') {
+                // Pérdida de Bollo → siempre Canal LOSS
+                results.push(this.createUnifiedConquest(conquest, 'LOSS'));
+                console.log(`🔴 [Filter] → Canal LOSS (pérdida de Bollo)`);
+            }
+            
+            if (involvesSpecificTribe) {
+                if (conquest.oldOwner?.tribe === specificTribe) {
+                    // La tribu específica perdió → Canal LOSS
+                    results.push(this.createUnifiedConquest(conquest, 'LOSS_SPECIFIC'));
+                    console.log(`🔴 [Filter] → Canal LOSS (pérdida de ${specificTribe})`);
+                }
+                
+                if (conquest.newOwner?.tribe === specificTribe) {
+                    // La tribu específica ganó → Canal GAIN
+                    results.push(this.createUnifiedConquest(conquest, 'GAIN'));
+                    console.log(`🟢 [Filter] → Canal GAIN (conquista de ${specificTribe})`);
+                }
+            }
+        }
+        
+        return results;
+    }
+
     /**
      * Genera clave única para identificar conquista
      */
@@ -121,15 +160,26 @@ class HybridConquestAnalyzer {
      * Aplica filtros específicos de tribus
      */
     applyTribeFilter(conquest, tribeFilter, targetTribeId) {
-        console.log(`🔍 [Filter] Aplicando filtro: ${tribeFilter} a conquista de ${conquest.villageName}`);
+        console.log(`🔍 [Filter] Aplicando filtro: ${JSON.stringify(tribeFilter)} a conquista de ${conquest.villageName}`);
         
         // Si el filtro es para mostrar todas las tribus
         if (tribeFilter === 'all' || (typeof tribeFilter === 'object' && tribeFilter.type === 'all')) {
-            console.log(`🌍 [Filter] Mostrando TODAS las tribus`);
-            return {
-                isRelevant: true,
-                type: this.determineConquestType(conquest, targetTribeId)
-            };
+            console.log(`🌍 [Filter] Mostrando TODAS las tribus - pero solo relevantes para Bollo`);
+            
+            // Para "todas las tribus", solo mostrar conquistas que involucren a Bollo
+            const conquestType = this.determineConquestType(conquest, targetTribeId);
+            
+            // Solo procesar si involucra a Bollo (GAIN o LOSS), ignorar NEUTRAL
+            if (conquestType === 'GAIN' || conquestType === 'LOSS') {
+                console.log(`✅ [Filter] Conquista relevante para Bollo: ${conquestType}`);
+                return {
+                    isRelevant: true,
+                    type: conquestType
+                };
+            } else {
+                console.log(`❌ [Filter] Conquista NEUTRAL ignorada (no involucra a Bollo)`);
+                return { isRelevant: false, type: null };
+            }
         }
         
         // Si el filtro es para una tribu específica

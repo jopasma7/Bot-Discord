@@ -206,12 +206,39 @@ class ConquestAutoMonitor {
      * Envía una alerta de conquista específica
      */
     async sendConquestAlert(conquest, channels) {
-        const isGain = conquest.type === 'GAIN';
-        const channel = isGain ? channels.gainsChannel : channels.lossesChannel;
+        // Determinar canal según tipo de conquista
+        let channel = null;
+        let isGain = false;
+        let includeEveryone = false;
+        
+        switch(conquest.type) {
+            case 'GAIN':
+            case 'GAIN_INFO':
+                channel = channels.gainsChannel;
+                isGain = true;
+                includeEveryone = false;
+                break;
+                
+            case 'LOSS':
+            case 'LOSS_SPECIFIC':
+                channel = channels.lossesChannel;
+                isGain = false;
+                includeEveryone = true;
+                break;
+                
+            default:
+                console.log(`⚠️ [SendAlert] Tipo de conquista no reconocido: ${conquest.type}`);
+                return;
+        }
+        
+        if (!channel) {
+            console.log(`❌ [SendAlert] Canal no disponible para tipo: ${conquest.type}`);
+            return;
+        }
         
         console.log(`🔍 Tipo de conquista: ${conquest.type}`);
         console.log(`📤 [SendAlert] Preparando notificación para canal ${channel.name}`);
-        console.log(`📊 [SendAlert] Tipo: ${conquest.type}, Incluir @everyone: ${!isGain}`);
+        console.log(`📊 [SendAlert] Tipo: ${conquest.type}, Incluir @everyone: ${includeEveryone}`);
 
         // Crear embed según el tipo de conquista
         const embed = this.createConquestEmbed(conquest, isGain);
@@ -222,8 +249,8 @@ class ConquestAutoMonitor {
             embeds: [embed]
         };
 
-        // Agregar @everyone para pérdidas
-        if (!isGain) {
+        // Agregar @everyone según configuración
+        if (includeEveryone) {
             message.content = '@everyone';
         }
 
