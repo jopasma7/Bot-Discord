@@ -159,6 +159,9 @@ class KillsNotificationScheduler {
         const defenseTotal = summary.totals?.defense || 0;
         const supportTotal = summary.totals?.support || 0;
         
+        // DEBUG: Log para verificar consistencia
+        console.log(`[NotificationScheduler] DEBUG: total=${total}, atk=${attackTotal}, def=${defenseTotal}, sup=${supportTotal}, suma=${attackTotal + defenseTotal + supportTotal}`);
+        
         // ARREGLADO: Calcular porcentajes correctos
         let attackPct = 0, defensePct = 0, supportPct = 0;
         if (total > 0) {

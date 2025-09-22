@@ -327,16 +327,17 @@ class KillsTracker {
             });
         });
         
-        // No recalcular 'all' - debería venir directamente de los datos GT
-        // La categoría 'all' ya incluye todos los adversarios (attack + defense + support)
+        // CORREGIDO: Recalcular 'all' sumando las categorías específicas
+        // Esto asegura consistencia incluso si los datos GT están incorrectos
+        totals.all = totals.attack + totals.defense + totals.support;
 
         // Encontrar top gainers
         const topGainers = players
             .map(player => {
-                // Si existe la categoría 'all', usar ese valor, si no sumar las específicas
-                const totalGained = player.categories.all ? 
-                    player.categories.all.gained : 
-                    Object.values(player.categories).reduce((sum, cat) => sum + cat.gained, 0);
+                // CORREGIDO: Siempre sumar las categorías específicas para consistencia
+                const totalGained = (player.categories.attack?.gained || 0) +
+                                  (player.categories.defense?.gained || 0) +
+                                  (player.categories.support?.gained || 0);
                 return { ...player, totalGained };
             })
             .sort((a, b) => b.totalGained - a.totalGained)
