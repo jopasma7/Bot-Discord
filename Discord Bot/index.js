@@ -35,25 +35,39 @@ for (const file of commandFiles) {
 }
 
 // Evento cuando el bot se conecta
-client.once('clientReady', () => {
+client.once('clientReady', async () => {
     console.log(`🤖 Bot conectado como ${client.user.tag}!`);
     console.log(`📊 Sirviendo en ${client.guilds.cache.size} servidores`);
     
     // Verificar servidores no autorizados
+    const unauthorizedGuilds = [];
     client.guilds.cache.forEach(guild => {
         if (!serverConfig.allowedGuilds.includes(guild.id)) {
             console.log(`⚠️ Bot detectado en servidor NO AUTORIZADO: ${guild.name} (${guild.id})`);
             if (serverConfig.autoLeaveUnauthorized) {
-                guild.leave();
-                console.log(`🚪 Saliendo automáticamente del servidor: ${guild.name}`);
+                unauthorizedGuilds.push(guild);
             }
         } else {
             console.log(`✅ Servidor autorizado: ${guild.name} (${guild.id})`);
         }
     });
     
+    // Salir de servidores no autorizados de forma asíncrona
+    for (const guild of unauthorizedGuilds) {
+        try {
+            await guild.leave();
+            console.log(`🚪 Saliendo automáticamente del servidor: ${guild.name}`);
+        } catch (error) {
+            console.error(`❌ Error saliendo del servidor ${guild.name}:`, error);
+        }
+    }
+    
+    console.log(`🎯 Verificación de servidores completada. Continuando inicialización...`);
+    
     // Estado del bot
     client.user.setActivity('Guerras Tribales 🏰', { type: 3 }); // 3 = WATCHING
+    
+    console.log(`✅ Bot completamente inicializado y listo para funcionar`);
 });
 
 // Manejar comandos slash
@@ -121,15 +135,19 @@ client.on('messageCreate', async message => {
 });
 
 // Evento cuando el bot es agregado a un nuevo servidor
-client.on('guildCreate', guild => {
+client.on('guildCreate', async guild => {
     console.log(`🆕 Bot agregado al servidor: ${guild.name} (${guild.id})`);
     
     if (!serverConfig.allowedGuilds.includes(guild.id)) {
         console.log(`⚠️ SERVIDOR NO AUTORIZADO: ${guild.name} (${guild.id})`);
         
         if (serverConfig.autoLeaveUnauthorized) {
-            guild.leave();
-            console.log(`🚪 Saliendo automáticamente del servidor no autorizado: ${guild.name}`);
+            try {
+                await guild.leave();
+                console.log(`🚪 Saliendo automáticamente del servidor no autorizado: ${guild.name}`);
+            } catch (error) {
+                console.error(`❌ Error saliendo del servidor ${guild.name}:`, error);
+            }
         } else {
             console.log(`🔒 Bot permanece en servidor no autorizado (autoLeaveUnauthorized = false)`);
             console.log(`💡 Para autorizar este servidor, agrega "${guild.id}" a server-config.json`);
