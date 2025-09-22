@@ -35,8 +35,8 @@ class ConquestAutoMonitor {
             return;
         }
 
-        console.log(`📊 Modo detectado: ${config.mode} (${config.interval}s)`);
-        console.log(`⏱️ Monitoreo configurado cada ${config.interval} segundos`);
+        console.log(`📊 Modo detectado: ${config.mode} (${config.interval/1000}s)`);
+        console.log(`⏱️ Monitoreo configurado cada ${config.interval/1000} segundos`);
 
         // Iniciar monitoreo con el intervalo configurado
         this.monitoringInterval = setInterval(async () => {
@@ -100,7 +100,7 @@ class ConquestAutoMonitor {
 
             // Obtener conquistas desde TWStats
             console.log('🔄 Intentando obtener conquistas desde TWStats...');
-            const conquests = await this.twstatsMonitor.getConquests();
+            const conquests = await this.twstatsMonitor.fetchConquests();
             
             if (!conquests || conquests.length === 0) {
                 console.log('⚠️ No se obtuvieron conquistas de TWStats');
