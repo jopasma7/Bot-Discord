@@ -438,7 +438,7 @@ async function sendTestAlert(channel, type) {
                     '🎯 **Conquistada por:** EnemyPlayer123',
                     '📊 **Puntos de la aldea:** 12.345',
                     '',
-                    '⏰ **Tiempo:** <t:' + Math.floor(Date.now() / 1000) + ':F>',
+                    '⏰ **Tiempo:** <t:' + Math.floor((Date.now() + 2 * 60 * 60 * 1000) / 1000) + ':F>',
                     '',
                     '🚨 **Esto es una alerta de prueba con datos ficticios**'
                 ].join('\n'));
@@ -462,7 +462,7 @@ async function sendTestAlert(channel, type) {
                     '👤 **Perdida por:** VictimPlayer456',
                     '📊 **Puntos de la aldea:** 8.976',
                     '',
-                    '⏰ **Tiempo:** <t:' + Math.floor(Date.now() / 1000) + ':F>',
+                    '⏰ **Tiempo:** <t:' + Math.floor((Date.now() + 2 * 60 * 60 * 1000) / 1000) + ':F>',
                     '',
                     '🚨 **Esto es una alerta de prueba con datos ficticios**'
                 ].join('\n'));
