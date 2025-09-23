@@ -174,12 +174,43 @@ class ConquestAutoMonitor {
             // Obtener conquistas desde TWStats
             console.log('🔄 Intentando obtener conquistas desde TWStats...');
             const conquests = await this.twstatsMonitor.fetchConquests();
-            
             if (!conquests || conquests.length === 0) {
                 console.log('⚠️ No se obtuvieron conquistas de TWStats');
+                // Intentar obtener conquistas desde GT oficial como respaldo
+                try {
+                    const ConquestMonitor = require('./conquest-monitor');
+                    const dataManager = this.client.dataManager || {};
+                    const gtMonitor = new ConquestMonitor(dataManager);
+                    const gtConquests = await gtMonitor.fetchRecentConquests();
+                    console.log(`🔄 Intentando obtener conquistas desde GT oficial...`);
+                    if (gtConquests && gtConquests.length > 0) {
+                        console.log(`📊 ✅ GT oficial: Descargadas ${gtConquests.length} conquistas`);
+                        // Usar el analizador híbrido para procesar conquistas de GT
+                        const relevantConquests = await this.analyzer.analyzeConquests(
+                            gtConquests,
+                            config.tribeId,
+                            Math.floor(config.lastCheck / 1000),
+                            !config.tribeFilter || config.tribeFilter.type === 'all',
+                            config.tribeFilter?.type === 'specific' ? config.tribeFilter.specificTribe : null
+                        );
+                        console.log(`🎯 Análisis GT oficial: ${relevantConquests.length} conquistas relevantes encontradas`);
+                        if (relevantConquests.length > 0) {
+                            const channels = await this.getChannels(config);
+                            if (channels.gainsChannel && channels.lossesChannel) {
+                                await this.sendNotifications(relevantConquests, channels);
+                            }
+                        } else {
+                            console.log('📋 No hay conquistas nuevas que procesar desde GT oficial');
+                        }
+                    } else {
+                        console.log('⚠️ No se obtuvieron conquistas de GT oficial');
+                    }
+                } catch (err) {
+                    console.error('❌ Error obteniendo conquistas desde GT oficial:', err);
+                }
                 return;
             }
-
+            
             console.log(`📊 ✅ TWStats: Descargadas ${conquests.length} conquistas`);
             console.log('📊 Usando fuente: TWStats');
 
@@ -386,7 +417,8 @@ class ConquestAutoMonitor {
                 },
                 {
                     name: '⏰ Tiempo',
-                    value: conquest.date.toLocaleString('es-ES', {
+                    value: new Date(conquest.timestamp * 1000).toLocaleString('es-ES', {
+                        timeZone: 'Europe/Madrid',
                         weekday: 'long',
                         year: 'numeric',
                         month: 'long',

@@ -85,27 +85,21 @@ class TWStatsConquestMonitor {
             // Formato: "2025-09-20 - 20:06:34"
             const match = dateText.match(/(\d{4})-(\d{1,2})-(\d{1,2})\s*-\s*(\d{1,2}):(\d{2}):(\d{2})/);
             if (!match) {
+                console.log('❌ [TWStats] Fecha no reconocida:', dateText);
                 return 0;
             }
-
             const [_, year, month, day, hour, minute, second] = match;
-            
-            // Crear la fecha interpretando que TWStats da la hora en zona horaria española
-            // Usar el formato ISO con zona horaria de Madrid
             const dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${second.padStart(2, '0')}`;
-            
             // Crear una fecha temporal para determinar el offset de España en esa fecha
             const tempDate = new Date(dateString + 'Z'); // UTC
             const madridTime = new Date(tempDate.toLocaleString("en-US", {timeZone: "Europe/Madrid"}));
             const utcTime = new Date(tempDate.toLocaleString("en-US", {timeZone: "UTC"}));
             const offsetMs = madridTime.getTime() - utcTime.getTime();
-            
             // Aplicar el offset a la fecha original (asumir que TWStats da hora local española)
             const date = new Date(dateString + 'Z');
             date.setTime(date.getTime() - offsetMs);
-
+            console.log(`[TWStats] Parseo fecha: original=${dateText}, dateString=${dateString}, offsetMs=${offsetMs}, final=${date.toLocaleString()}`);
             return Math.floor(date.getTime() / 1000);
-            
         } catch (error) {
             console.error('❌ [TWStats] Error parsing date:', dateText, error);
             return 0;
