@@ -146,11 +146,25 @@ client.on('interactionCreate', async interaction => {
             
             // Crear embed de respuesta detallado
             const { EmbedBuilder } = require('discord.js');
+            // Determinar el estado
+            let estado = 'Análisis completado';
+            if (analysis.totalEntries === 0) {
+                estado = 'Sin datos suficientes para análisis';
+            } else if (analysis.totalEntries < 10) {
+                estado = 'Pocos datos disponibles';
+            }
+            // Puedes agregar más condiciones si lo deseas
+
             const analysisEmbed = new EmbedBuilder()
                 .setColor('#FF6B35')
                 .setTitle(`📊 Análisis de Actividad: ${data.name}`)
                 .setDescription(`**Coordenadas:** ${x}|${y}\n**Propietario:** ${data.owner}${data.tribe ? `\n**Tribu:** ${data.tribe}` : ''}\n**Puntos:** ${data.points.toLocaleString()}`)
                 .addFields([
+                    {
+                        name: '🔍 Estado',
+                        value: estado,
+                        inline: false
+                    },
                     {
                         name: '� Zona Horaria Estimada',
                         value: `**${analysis.timezone}**\n${analysis.pattern}\n*Confianza: ${analysis.confidence}*`,
@@ -163,7 +177,7 @@ client.on('interactionCreate', async interaction => {
                     },
                     {
                         name: '📅 Período Analizado',
-                        value: `**Desde:** ${analysis.analysisRange.from?.split(' ')[0] || 'N/A'}\n**Hasta:** ${analysis.analysisRange.to?.split(' ')[0] || 'N/A'}`,
+                        value: `**Desde:** ${(analysis.analysisRange?.from && typeof analysis.analysisRange.from === 'string') ? analysis.analysisRange.from.split(' ')[0] : 'N/A'}\n**Hasta:** ${(analysis.analysisRange?.to && typeof analysis.analysisRange.to === 'string') ? analysis.analysisRange.to.split(' ')[0] : 'N/A'}`,
                         inline: true
                     }
                 ])
