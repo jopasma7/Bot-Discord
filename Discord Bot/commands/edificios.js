@@ -351,19 +351,39 @@ module.exports = {
                 if (possibleUpgrades.length > 0) {
                     upgradeText += '**Posibles mejoras:**\n';
                     possibleUpgrades.forEach((pUpgrade, idx) => {
-                        if (pUpgrade.type === 'single') {
-                            const emoji = buildingEmojis[pUpgrade.building] || '🏗️';
-                            upgradeText += `${idx + 1}. ${emoji} ${pUpgrade.building} ${pUpgrade.fromLevel}→${pUpgrade.toLevel} (${pUpgrade.pointsCost} pts)\n`;
-                        } else if (pUpgrade.type === 'multiple') {
-                            const emoji = buildingEmojis[pUpgrade.building] || '🏗️';
-                            upgradeText += `${idx + 1}. ${emoji} ${pUpgrade.building} ${pUpgrade.fromLevel}→${pUpgrade.toLevel} (+${pUpgrade.levelsUpgraded} niveles, ${pUpgrade.pointsCost} pts)\n`;
-                        } else if (pUpgrade.type === 'combination') {
-                            upgradeText += `${idx + 1}. Combinación:\n`;
-                            pUpgrade.buildings.forEach(b => {
-                                const emoji = buildingEmojis[b.building] || '🏗️';
-                                upgradeText += `   • ${emoji} ${b.building} ${b.fromLevel}→${b.toLevel} (${b.pointsCost} pts)\n`;
-                            });
-                        }
+                            if (!pUpgrade || !pUpgrade.building) {
+                                upgradeText += `${idx + 1}. ⚠️ Datos de mejora incompletos\n`;
+                                return;
+                            }
+                            if (pUpgrade.type === 'single') {
+                                const emoji = buildingEmojis[pUpgrade.building] || '🏗️';
+                                if (typeof pUpgrade.fromLevel === 'number' && typeof pUpgrade.toLevel === 'number') {
+                                    upgradeText += `${idx + 1}. ${emoji} ${pUpgrade.building} ${pUpgrade.fromLevel}→${pUpgrade.toLevel} (${pUpgrade.pointsCost} pts)\n`;
+                                } else {
+                                    upgradeText += `${idx + 1}. ⚠️ Niveles no disponibles\n`;
+                                }
+                            } else if (pUpgrade.type === 'multiple') {
+                                const emoji = buildingEmojis[pUpgrade.building] || '🏗️';
+                                if (typeof pUpgrade.fromLevel === 'number' && typeof pUpgrade.toLevel === 'number') {
+                                    upgradeText += `${idx + 1}. ${emoji} ${pUpgrade.building} ${pUpgrade.fromLevel}→${pUpgrade.toLevel} (+${pUpgrade.levelsUpgraded} niveles, ${pUpgrade.pointsCost} pts)\n`;
+                                } else {
+                                    upgradeText += `${idx + 1}. ⚠️ Niveles no disponibles\n`;
+                                }
+                            } else if (pUpgrade.type === 'combination' && Array.isArray(pUpgrade.buildings)) {
+                                upgradeText += `${idx + 1}. Combinación:\n`;
+                                pUpgrade.buildings.forEach(b => {
+                                    if (!b || !b.building) {
+                                        upgradeText += `   • ⚠️ Datos de mejora incompletos\n`;
+                                        return;
+                                    }
+                                    const emoji = buildingEmojis[b.building] || '🏗️';
+                                    if (typeof b.fromLevel === 'number' && typeof b.toLevel === 'number') {
+                                        upgradeText += `   • ${emoji} ${b.building} ${b.fromLevel}→${b.toLevel} (${b.pointsCost} pts)\n`;
+                                    } else {
+                                        upgradeText += `   • ⚠️ Niveles no disponibles\n`;
+                                    }
+                                });
+                            }
                     });
                 } else {
                     upgradeText += `*No se detectaron mejoras específicas de ${buildingName.toLowerCase()}*\n`;
