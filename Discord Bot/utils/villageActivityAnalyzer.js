@@ -156,102 +156,41 @@ class VillageActivityAnalyzer {
         try {
             // Buscar la tabla del historial
             const tableMatch = html.match(/<table[^>]*>[\s\S]*?<\/table>/gi);
-            
-                    tableIndex = i;
-                
-            const info = {
-                name: 'Desconocida',
-                owner: 'Desconocido',
-                tribe: null,
-                points: 0,
-                coordinates: { x: 0, y: 0 }
-            };
-
-            try {
-                // Extraer nombre de la aldea
-                const nameMatch = html.match(/<h2[^>]*>([^<]+)</);
-                if (nameMatch) {
-                    info.name = nameMatch[1].trim();
-                }
-
-                // Extraer propietario (más tolerante, acepta "-", "Bárbaros", etc)
-                let ownerMatch = html.match(/Propietario[^:]*:?\s*<[^>]*>([^<]*)</i);
-                if (ownerMatch) {
-                    let owner = ownerMatch[1].trim();
-                    if (owner === '-' || owner === '' || owner.toLowerCase().includes('bárbar')) {
-                        info.owner = 'Bárbaros';
-                    } else {
-                        info.owner = owner;
-                    }
-                }
-
-                // Extraer tribu si existe
-                const tribeMatch = html.match(/Tribu[^:]*:?\s*<[^>]*>([^<]*)</i);
-                if (tribeMatch && tribeMatch[1].trim() !== '-' && tribeMatch[1].trim() !== '') {
-                    info.tribe = tribeMatch[1].trim();
-                }
-
-                // Extraer puntos (más tolerante, acepta "0 puntos", "- puntos", etc)
-                let pointsMatch = html.match(/([\d.,]+)\s*puntos/i);
-                if (pointsMatch) {
-                    info.points = parseInt(pointsMatch[1].replace(/[,\.]/g, ''));
-                } else {
-                    // Si no hay puntos, buscar "0 puntos" o similar
-                    if (html.includes('0 puntos')) info.points = 0;
-                }
-
-                // Extraer coordenadas
-                const coordMatch = html.match(/(\d{1,3})\|(\d{1,3})/);
-                if (coordMatch) {
-                    info.coordinates.x = parseInt(coordMatch[1]);
-                    info.coordinates.y = parseInt(coordMatch[2]);
-                }
-
-                // Log extra si no se encuentra propietario o puntos
-                if (info.owner === 'Desconocido' || info.points === 0) {
-                    console.warn('[ActivityAnalyzer] Propietario o puntos no detectados. Fragmento HTML:', html.substring(0, 500));
-                }
-
-            } catch (error) {
-                console.error('[ActivityAnalyzer] Error parseando info básica:', error);
+            if (!tableMatch || tableMatch.length === 0) {
+                return [];
             }
-
-            return info;
-            
+            // Buscar filas de la tabla
+            const rowMatches = tableMatch[0].match(/<tr[^>]*>[\s\S]*?<\/tr>/gi);
+            if (!rowMatches || rowMatches.length === 0) {
+                return [];
+            }
             for (let i = 0; i < rowMatches.length; i++) {
                 const row = rowMatches[i];
                 // Mejorar el regex para capturar contenido de celdas con HTML interno
                 const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
-                
                 if (!cells || cells.length < 4) {
                     if (i < 5) console.log(`[ActivityAnalyzer] Fila ${i} ignorada: ${cells?.length || 0} celdas encontradas`);
                     continue;
                 }
-
                 // Limpiar contenido de las celdas
                 const cleanCells = cells.map(cell => {
                     // Extraer solo el contenido entre <td> y </td>, luego limpiar HTML
                     const content = cell.replace(/<td[^>]*>([\s\S]*?)<\/td>/i, '$1');
                     return content.replace(/<[^>]*>/g, '').trim();
                 });
-
                 if (i < 3) console.log(`[ActivityAnalyzer] Fila ${i} células limpias:`, cleanCells);
-
                 // Parsear fecha y hora (formato esperado: 2025-09-21 14:04)
                 const dateTimeMatch = cleanCells[0]?.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
                 if (!dateTimeMatch) {
                     if (i < 5) console.log(`[ActivityAnalyzer] Fila ${i}: no coincide formato fecha/hora: "${cleanCells[0]}"`);
                     continue;
                 }
-
                 const [, date, time] = dateTimeMatch;
                 const points = parseInt(cleanCells[1]) || 0;
                 const change = parseInt(cleanCells[2]?.replace('+', '')) || 0;
-                
                 // Parsear tiempo transcurrido (3º columna: 1h, 2h, 4h, 6h, etc.)
                 const timeGapMatch = cleanCells[3]?.match(/(\d+)h/);
                 const hoursGap = timeGapMatch ? parseInt(timeGapMatch[1]) : 1;
-
                 if (points > 0) {
                     history.push({
                         timestamp: `${date} ${time}`,
@@ -262,13 +201,10 @@ class VillageActivityAnalyzer {
                     });
                 }
             }
-
             console.log(`[ActivityAnalyzer] Parseadas ${history.length} entradas de historial`);
-            
         } catch (error) {
             console.error('[ActivityAnalyzer] Error parseando historial:', error);
         }
-
         return history.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     }
 
@@ -278,9 +214,22 @@ class VillageActivityAnalyzer {
     analyzeActivityPatterns(history, playerPoints = null) {
         if (!history || history.length === 0) {
             return {
-                confidence: 'low',
+                totalEntries: 0,
+                reliableEntries: 0,
+                reliabilityPercentage: 0,
+                playerLevel: 'unknown',
+                analysisWeight: 'low',
+                analysisRange: {
+                    from: 'N/A',
+                    to: 'N/A'
+                },
+                hourlyActivity: [],
+                realInactivityPeriods: [],
+                consistentSleepPatterns: [],
                 timezone: 'unknown',
-                pattern: 'Insuficientes datos para análisis'
+                confidence: 'baja',
+                pattern: 'Insuficientes datos para análisis',
+                insights: ['❌ No hay datos suficientes para analizar actividad']
             };
         }
 
@@ -332,8 +281,8 @@ class VillageActivityAnalyzer {
             playerLevel: isEarlyGameDominant ? 'early_game' : 'advanced',
             analysisWeight,
             analysisRange: {
-                from: history[history.length - 1]?.timestamp,
-                to: history[0]?.timestamp
+                from: history[history.length - 1]?.timestamp || 'N/A',
+                to: history[0]?.timestamp || 'N/A'
             },
             hourlyActivity: hourlyPercentages.map((percentage, hour) => ({
                 hour: `${hour.toString().padStart(2, '0')}:00`,
