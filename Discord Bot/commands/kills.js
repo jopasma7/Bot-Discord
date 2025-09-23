@@ -243,9 +243,13 @@ module.exports = {
         
         for (let i = 0; i < topMembers.length; i++) {
             const member = topMembers[i];
-            const medal = i < 3 ? ['🥇', '🥈', '🥉'][i] : `${i + 1}.`;
-            memberList += `${medal} **${member.name}**\n`;
-            memberList += `⚔️ ${member.kills.all.kills.toLocaleString()} ⚡ ${member.kills.attack.kills.toLocaleString()} 🛡️ ${member.kills.defense.kills.toLocaleString()} 🤝 ${member.kills.support.kills.toLocaleString()}\n\n`;
+            const medal = i < 3 ? ['🥇', '🥈', '🥉'][i] : `${i + 1}️⃣`;
+            let tribeName = '';
+            if (member.tribeId && member.tribeId !== 0) {
+                const memberTribe = tribes.find(t => t.id === member.tribeId);
+                tribeName = memberTribe ? memberTribe.name : `Tribu ID: ${member.tribeId}`;
+            }
+            memberList += `${medal} (${tribeName || 'Sin tribu'}) ${member.name} +${member.kills.all.kills.toLocaleString()} (⚡ ${member.kills.attack.kills.toLocaleString()} 🛡️ ${member.kills.defense.kills.toLocaleString()} 🤝 ${member.kills.support.kills.toLocaleString()})\n`;
         }
 
         if (memberList.length > 1024) {

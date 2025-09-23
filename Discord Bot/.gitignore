@@ -12,6 +12,11 @@ yarn-error.log*
 .env.production.local
 gt-bot.env
 
+# Archivos de kills
+data/kills-tracker.json
+data/kills-notifications.json
+backups/kills-tracker-*.json
+
 # Runtime data
 pids
 *.pid
