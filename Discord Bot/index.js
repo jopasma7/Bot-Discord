@@ -419,7 +419,8 @@ async function handleCoordinateMessage(message, matches) {
             .setTimestamp();
         
         // Crear botones
-        const gameUrl = `https://es95.guerrastribales.es/game.php?village=914&screen=info_village&id=2528#${x};${y}`;
+            // Enlace correcto usando coordenadas para buscar la aldea en el mapa
+            const gameUrl = `https://es95.guerrastribales.es/game.php?screen=map&x=${x}&y=${y}`;
         
         const row = new ActionRowBuilder()
             .addComponents(
