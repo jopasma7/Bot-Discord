@@ -154,32 +154,39 @@ class VillageActivityAnalyzer {
         const history = [];
         
         try {
-            // Buscar la tabla del historial
-            const tableMatch = html.match(/<table[^>]*>[\s\S]*?<\/table>/gi);
-            if (!tableMatch || tableMatch.length === 0) {
+            // Buscar la tabla del historial (la que contiene la fecha y puntos)
+            const tables = html.match(/<table[^>]*>[\s\S]*?<\/table>/gi);
+            if (!tables || tables.length === 0) {
                 return [];
             }
+            // Buscar la tabla que contiene filas con fechas (formato YYYY-MM-DD)
+            let historyTable = null;
+            for (const t of tables) {
+                if (t.match(/\d{4}-\d{2}-\d{2}/)) {
+                    historyTable = t;
+                    break;
+                }
+            }
+            if (!historyTable) return [];
             // Buscar filas de la tabla
-            const rowMatches = tableMatch[0].match(/<tr[^>]*>[\s\S]*?<\/tr>/gi);
+            const rowMatches = historyTable.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi);
             if (!rowMatches || rowMatches.length === 0) {
                 return [];
             }
             for (let i = 0; i < rowMatches.length; i++) {
                 const row = rowMatches[i];
-                // Mejorar el regex para capturar contenido de celdas con HTML interno
                 const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
-                if (!cells || cells.length < 4) {
+                if (!cells || cells.length < 3) {
                     if (i < 5) console.log(`[ActivityAnalyzer] Fila ${i} ignorada: ${cells?.length || 0} celdas encontradas`);
                     continue;
                 }
                 // Limpiar contenido de las celdas
                 const cleanCells = cells.map(cell => {
-                    // Extraer solo el contenido entre <td> y </td>, luego limpiar HTML
                     const content = cell.replace(/<td[^>]*>([\s\S]*?)<\/td>/i, '$1');
                     return content.replace(/<[^>]*>/g, '').trim();
                 });
                 if (i < 3) console.log(`[ActivityAnalyzer] Fila ${i} células limpias:`, cleanCells);
-                // Parsear fecha y hora (formato esperado: 2025-09-21 14:04)
+                // Parsear fecha y hora
                 const dateTimeMatch = cleanCells[0]?.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
                 if (!dateTimeMatch) {
                     if (i < 5) console.log(`[ActivityAnalyzer] Fila ${i}: no coincide formato fecha/hora: "${cleanCells[0]}"`);
@@ -187,16 +194,19 @@ class VillageActivityAnalyzer {
                 }
                 const [, date, time] = dateTimeMatch;
                 const points = parseInt(cleanCells[1]) || 0;
-                const change = parseInt(cleanCells[2]?.replace('+', '')) || 0;
-                // Parsear tiempo transcurrido (3º columna: 1h, 2h, 4h, 6h, etc.)
-                const timeGapMatch = cleanCells[3]?.match(/(\d+)h/);
-                const hoursGap = timeGapMatch ? parseInt(timeGapMatch[1]) : 1;
+                const change = cleanCells[2] ? parseInt(cleanCells[2].replace('+', '')) || 0 : 0;
+                // Si hay columna de horas, parsearla
+                let hoursGap = 1;
+                if (cleanCells.length > 3) {
+                    const timeGapMatch = cleanCells[3]?.match(/(\d+)h/);
+                    hoursGap = timeGapMatch ? parseInt(timeGapMatch[1]) : 1;
+                }
                 if (points > 0) {
                     history.push({
                         timestamp: `${date} ${time}`,
                         points,
                         change,
-                        hoursGap, // NUEVO: tiempo transcurrido desde la anterior
+                        hoursGap,
                         hour: parseInt(time.split(':')[0])
                     });
                 }
