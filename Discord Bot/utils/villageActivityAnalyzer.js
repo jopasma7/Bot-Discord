@@ -107,43 +107,49 @@ class VillageActivityAnalyzer {
             points: 0,
             coordinates: { x: 0, y: 0 }
         };
-
         try {
-            // Extraer nombre de la aldea
-            const nameMatch = html.match(/<h2[^>]*>([^<]+)</);
-            if (nameMatch) {
-                info.name = nameMatch[1].trim();
+            // Buscar la tabla principal de la aldea (donde aparecen los datos clave)
+            const mainTableMatch = html.match(/<table[^>]*>[\s\S]*?<\/table>/gi);
+            if (mainTableMatch && mainTableMatch.length > 0) {
+                // Buscar la tabla que contiene las coordenadas y propietario
+                let mainTable = null;
+                for (const t of mainTableMatch) {
+                    if (t.includes('|') && t.includes('K')) {
+                        mainTable = t;
+                        break;
+                    }
+                }
+                if (mainTable) {
+                    // Extraer filas
+                    const rowMatches = mainTable.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi);
+                    if (rowMatches && rowMatches.length > 0) {
+                        // Extraer celdas limpias
+                        let allCells = [];
+                        for (const row of rowMatches) {
+                            const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
+                            if (cells) {
+                                allCells.push(...cells.map(cell => cell.replace(/<[^>]*>/g, '').trim()));
+                            }
+                        }
+                        // Buscar nombre, coordenadas, puntos, propietario, tribu
+                        // Ejemplo de orden: [BEBBAMBURG, 486|530, K54, 1,257, LEON DE DAMASCO, ASTURI, ...]
+                        if (allCells.length >= 6) {
+                            info.name = allCells[0];
+                            const coordsMatch = allCells[1].match(/(\d{1,3})\|(\d{1,3})/);
+                            if (coordsMatch) {
+                                info.coordinates.x = parseInt(coordsMatch[1]);
+                                info.coordinates.y = parseInt(coordsMatch[2]);
+                            }
+                            info.points = parseInt(allCells[3].replace(/[,\.]/g, ''));
+                            info.owner = allCells[4];
+                            info.tribe = allCells[5];
+                        }
+                    }
+                }
             }
-
-            // Extraer propietario
-            const ownerMatch = html.match(/Propietario[^:]*:?\s*<[^>]*>([^<]+)</i);
-            if (ownerMatch) {
-                info.owner = ownerMatch[1].trim();
-            }
-
-            // Extraer tribu si existe
-            const tribeMatch = html.match(/Tribu[^:]*:?\s*<[^>]*>([^<]+)</i);
-            if (tribeMatch && tribeMatch[1].trim() !== '-' && tribeMatch[1].trim() !== '') {
-                info.tribe = tribeMatch[1].trim();
-            }
-
-            // Extraer puntos
-            const pointsMatch = html.match(/(\d{1,3}(?:[,\.]\d{3})*)\s*puntos/i);
-            if (pointsMatch) {
-                info.points = parseInt(pointsMatch[1].replace(/[,\.]/g, ''));
-            }
-
-            // Extraer coordenadas
-            const coordMatch = html.match(/(\d{1,3})\|(\d{1,3})/);
-            if (coordMatch) {
-                info.coordinates.x = parseInt(coordMatch[1]);
-                info.coordinates.y = parseInt(coordMatch[2]);
-            }
-
         } catch (error) {
             console.error('[ActivityAnalyzer] Error parseando info básica:', error);
         }
-
         return info;
     }
 
