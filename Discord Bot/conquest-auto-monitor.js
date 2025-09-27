@@ -218,22 +218,23 @@ class ConquestAutoMonitor {
             const lastCheck = config.lastCheck || 0;
             const lastCheckDate = new Date(lastCheck);
             const currentTime = new Date();
-            
+            // Permitir margen de 5 minutos para conquistas recientes
+            const marginSeconds = 5 * 60;
+            const effectiveLastCheck = Math.floor(lastCheck / 1000) - marginSeconds;
             console.log(`⏰ LastCheck: ${lastCheck} (${lastCheckDate.toLocaleString()})`);
             console.log(`🕒 Hora actual: ${currentTime.toLocaleString()}`);
-            console.log(`🔍 Buscando conquistas posteriores a: ${lastCheckDate.toLocaleString()}`);
+            console.log(`🔍 Buscando conquistas posteriores a: ${new Date((effectiveLastCheck) * 1000).toLocaleString()}`);
 
             // Leer configuración de filtros de tribu
             const showAllTribes = !config.tribeFilter || config.tribeFilter.type === 'all';
             const specificTribe = config.tribeFilter?.type === 'specific' ? config.tribeFilter.specificTribe : null;
-            
             console.log(`🎯 Filtro configurado: ${showAllTribes ? 'TODAS las tribus' : `Solo tribu "${specificTribe}"`}`);
 
             // Analizar conquistas relevantes
             const relevantConquests = await this.analyzer.analyzeConquests(
                 conquests,
                 config.tribeId,
-                Math.floor(lastCheck / 1000), // Convertir a timestamp Unix
+                effectiveLastCheck, // Usar margen para no perder conquistas recientes
                 showAllTribes,
                 specificTribe
             );

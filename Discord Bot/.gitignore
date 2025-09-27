@@ -1,3 +1,8 @@
+# Ignorar carpeta de kills completa, excepto kills-notifications.json
+data/kills/
+!data/kills-notifications.json
+# Ignorar archivos de kills comprimidos
+data/kills/*.txt.gz
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -14,7 +19,6 @@ gt-bot.env
 
 # Archivos de kills
 data/kills-tracker.json
-data/kills-notifications.json
 backups/kills-tracker-*.json
 
 # Runtime data
@@ -38,6 +42,9 @@ coverage/
 
 # Bower dependency directory (https://bower.io/)
 bower_components
+
+# Ignorar archivos comprimidos .txt.gz
+*.txt.gz
 
 # node-waf configuration
 .lock-wscript

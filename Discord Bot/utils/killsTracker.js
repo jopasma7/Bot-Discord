@@ -273,8 +273,7 @@ class KillsTracker {
             Object.keys(changes.players).forEach(playerId => {
                 const player = playerMap.get(playerId);
                 if (player) {
-                    const tribe = player.tribe ? tribeMap.get(player.tribe.toString()) : null;
-                    
+                    const tribe = player.tribeId ? tribeMap.get(player.tribeId.toString()) : null;
                     changes.players[playerId].playerData = {
                         name: player.name,
                         points: player.points,
@@ -285,7 +284,6 @@ class KillsTracker {
                             rank: tribe.rank
                         } : null
                     };
-                    
                     console.log(`[KillsTracker] Jugador ${playerId} -> ${player.name} [${tribe?.tag || 'Sin tribu'}]`);
                 } else {
                     console.warn(`[KillsTracker] Jugador ${playerId} no encontrado en datos GT`);
@@ -331,17 +329,15 @@ class KillsTracker {
         // Esto asegura consistencia incluso si los datos GT están incorrectos
         totals.all = totals.attack + totals.defense + totals.support;
 
-        // Encontrar top gainers
+        // Encontrar top gainers (todos los jugadores con cambios, ordenados)
         const topGainers = players
             .map(player => {
-                // CORREGIDO: Siempre sumar las categorías específicas para consistencia
                 const totalGained = (player.categories.attack?.gained || 0) +
                                   (player.categories.defense?.gained || 0) +
                                   (player.categories.support?.gained || 0);
                 return { ...player, totalGained };
             })
-            .sort((a, b) => b.totalGained - a.totalGained)
-            .slice(0, 5);
+            .sort((a, b) => b.totalGained - a.totalGained);
 
         return {
             hasChanges: true,

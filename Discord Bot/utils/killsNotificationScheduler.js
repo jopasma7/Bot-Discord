@@ -115,9 +115,12 @@ class KillsNotificationScheduler {
                 return;
             }
 
-            const channel = guild.channels.cache.get(guildConfig.channelId);
+            // Usar variable de entorno si está definida
+            let channelId = process.env.KILLS_CHANNEL_ID || guildConfig.channelId;
+            const channel = guild.channels.cache.get(channelId);
             if (!channel) {
-                console.log(`[NotificationScheduler] Canal ${guildConfig.channelId} no encontrado en ${guild.name}`);
+                console.log(`[NotificationScheduler] Canal ${channelId} no encontrado en ${guild.name}`);
+                // Opcional: enviar aviso al owner del servidor
                 return;
             }
 
