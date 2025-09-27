@@ -51,29 +51,35 @@ module.exports = {
     const despues = interaction.options.getInteger('despues');
     if (antes !== null && despues !== null) {
       const diff = despues - antes;
-      // Calcular los niveles subidos
-      const incr = wall.incrementalPoints.slice(1); // El primer valor es 0, ignorar
-      let suma = 0;
-      let niveles = [];
-      for (let i = 0; i < incr.length; i++) {
-        suma = 0;
-        let tempNiveles = [];
-        for (let j = i; j < incr.length; j++) {
-          suma += incr[j];
-          tempNiveles.push(j+1);
-          if (suma === diff) {
-            niveles = tempNiveles.slice();
-            break;
-          }
-          if (suma > diff) break;
-        }
-        if (niveles.length > 0) break;
-      }
-      let analisis = '';
-      if (niveles.length > 0) {
-        analisis = `🔎 **Análisis de puntos:**\nLa diferencia de puntos es **${diff}**.\nSe subieron los niveles de muralla: ${niveles.map(n => `Nivel ${n}`).join(', ')}.`;
+      const puntos = wall.points;
+      let analisis = `🔎 **Análisis de puntos:**\nLa diferencia de puntos es **${diff}**.`;
+      // 1. Verificar si la diferencia coincide con algún valor de wall.points (subida directa a un nivel)
+      let nivelDirecto = puntos.findIndex(p => p === diff);
+      if (nivelDirecto > 0) {
+        analisis += `\nSubiste directamente al nivel **${nivelDirecto}** de muralla.`;
       } else {
-        analisis = `🔎 **Análisis de puntos:**\nLa diferencia de puntos es **${diff}**.\nNo se encontró una combinación exacta de niveles de muralla para esa diferencia.`;
+        // 2. Buscar combinaciones de niveles consecutivos que sumen diff
+        let encontrado = false;
+        for (let inicio = 1; inicio < puntos.length; inicio++) {
+          let suma = 0;
+          for (let fin = inicio; fin < puntos.length; fin++) {
+            suma += puntos[fin];
+            if (suma === diff) {
+              analisis += `\nSubiste del nivel **${inicio}** al **${fin}** de muralla.`;
+              encontrado = true;
+              break;
+            }
+            if (suma > diff) break;
+          }
+          if (encontrado) break;
+        }
+        if (!encontrado) {
+          if (diff === 0) {
+            analisis += `\nNo subiste de nivel de muralla.`;
+          } else {
+            analisis += `\n❌ No se encontró una combinación secuencial de niveles de muralla para esa diferencia.`;
+          }
+        }
       }
       embed.addFields({ name: 'Análisis de subida de muralla', value: analisis });
     }

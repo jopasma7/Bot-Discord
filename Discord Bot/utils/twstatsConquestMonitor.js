@@ -112,26 +112,26 @@ class TWStatsConquestMonitor {
     async fetchConquests() {
         try {
             console.log('🌐 [TWStats] Obteniendo conquistas desde TWStats...');
-            
+
             const response = await axios.get(this.baseUrl, {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 },
                 timeout: 15000
             });
-            
+
             const dom = new JSDOM(response.data);
             const document = dom.window.document;
-            
+
             // Buscar la tabla correcta de conquistas
             const tables = document.querySelectorAll('table');
             let conquestsTable = null;
-            
+
             for (let table of tables) {
                 const headerRow = table.querySelector('tr');
                 if (headerRow) {
                     const headers = headerRow.querySelectorAll('th, td');
-                    if (headers.length >= 5 && 
+                    if (headers.length >= 5 &&
                         headers[0].textContent.trim() === 'Pueblos' &&
                         headers[4].textContent.trim() === 'Fecha/Tiempo') {
                         conquestsTable = table;
@@ -140,14 +140,14 @@ class TWStatsConquestMonitor {
                     }
                 }
             }
-            
+
             if (!conquestsTable) {
                 throw new Error('No se encontró la tabla de conquistas');
             }
-            
+
             const rows = conquestsTable.querySelectorAll('tr');
             const conquests = [];
-            
+
             // Procesar filas de datos (saltar header)
             for (let i = 1; i < rows.length; i++) {
                 const conquest = this.parseConquestRow(rows[i]);
@@ -155,22 +155,26 @@ class TWStatsConquestMonitor {
                     conquests.push(conquest);
                 }
             }
-            
+
             // Ordenar por timestamp descendente
             conquests.sort((a, b) => b.timestamp - a.timestamp);
-            
+
             console.log(`🌐 [TWStats] Obtenidas ${conquests.length} conquistas válidas`);
-            
+
             if (conquests.length > 0) {
                 const latest = conquests[0];
                 console.log(`🌐 [TWStats] Más reciente: ${latest.villageName} por ${latest.newOwner.name} (${latest.date.toLocaleString()})`);
             }
-            
+
             return conquests;
-            
+
         } catch (error) {
-            console.error('❌ [TWStats] Error:', error.message);
-            throw new Error(`Error fetching TWStats conquests: ${error.message}`);
+            if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                console.warn('⚠️ [TWStats] Tiempo de espera agotado al intentar obtener conquistas. Se usará el respaldo si está disponible.');
+            } else {
+                console.warn(`⚠️ [TWStats] Error al obtener conquistas: ${error.message}`);
+            }
+            throw new Error('Error fetching TWStats conquests: ' + (error.code === 'ECONNABORTED' ? 'timeout' : error.message));
         }
     }
 }

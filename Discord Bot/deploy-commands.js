@@ -26,14 +26,14 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN);
     try {
         console.log(`🔄 Registrando ${commands.length} comandos slash...`);
 
-        // Registrar comandos globalmente (tardan hasta 1 hora en aparecer)
-        // Para desarrollo, es mejor registrar en un servidor específico
+        // Registrar comandos SOLO en el servidor especificado para que aparezcan al instante
+        const GUILD_ID = '1412768836955930668';
         const data = await rest.put(
-            Routes.applicationCommands(process.env.CLIENT_ID),
+            Routes.applicationGuildCommands(process.env.CLIENT_ID, GUILD_ID),
             { body: commands },
         );
 
-        console.log(`✅ ${data.length} comandos registrados correctamente!`);
+        console.log(`✅ ${data.length} comandos registrados correctamente en el servidor ${GUILD_ID}!`);
     } catch (error) {
         console.error('❌ Error registrando comandos:', error);
     }
