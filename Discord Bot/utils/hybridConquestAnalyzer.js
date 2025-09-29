@@ -77,17 +77,18 @@ class HybridConquestAnalyzer {
         
         if (isAllTribes) {
             // FILTRO: "Todas las tribus"
-            // Canal GAIN: TODAS las conquistas del mundo
+            // Canal GAIN: TODAS las conquistas del mundo, EXCEPTO cuando Bollo pierde un pueblo
             // Canal LOSS: Solo pérdidas de Bollo
-            
+
             if (bolloType === 'LOSS') {
                 // Pérdida de Bollo → Canal LOSS
                 results.push(this.createUnifiedConquest(conquest, 'LOSS'));
                 console.log(`🔴 [Filter] → Canal LOSS (pérdida de Bollo)`);
+                // NO agregar al canal de conquistas (GAIN) si Bollo perdió el pueblo
+                return results;
             }
-            
-            // TODAS las conquistas → Canal GAIN (como información general)
-            // Pero marcamos diferente las que no son de Bollo
+
+            // Solo agregar al canal de conquistas si NO es una pérdida de Bollo
             const gainType = bolloType === 'GAIN' ? 'GAIN' : 'GAIN_INFO';
             results.push(this.createUnifiedConquest(conquest, gainType));
             console.log(`🟢 [Filter] → Canal GAIN (${gainType})`);

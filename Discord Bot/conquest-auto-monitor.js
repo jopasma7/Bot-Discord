@@ -381,15 +381,43 @@ class ConquestAutoMonitor {
      */
     createConquestEmbed(conquest, isGain) {
         const title = isGain ? '🟢 ¡ALDEA CONQUISTADA!' : '🔴 ¡ALDEA PERDIDA!';
-        const color = isGain ? '#00ff00' : '#ff0000';
-        
+        let color = isGain ? '#00ff00' : '#ff0000'; // default green/red
+
+        // Lógica de color avanzada para conquistas ganadas
+        if (isGain) {
+            const conqueringTribe = conquest.newOwner.tribe ? conquest.newOwner.tribe.trim() : '';
+            const lostBy = conquest.oldOwner.name ? conquest.oldOwner.name.trim().toLowerCase() : '';
+            // ¿Es conquistador de la tribu Bollo?
+            if (conqueringTribe.toLowerCase() === 'bollo') {
+                // ¿Conquistó a bárbaros?
+                if (lostBy === 'bárbaro' || lostBy === 'barbaro') {
+                    color = '#3498db'; // Azul
+                } else {
+                    color = '#00ff00'; // Verde
+                }
+            } else {
+                // No es de Bollo
+                if (lostBy === 'bárbaro' || lostBy === 'barbaro') {
+                    color = '#7f8c8d'; // Gris
+                } else {
+                    color = '#632f17ff'; // Marrón
+                }
+            }
+        }
+
         const coordinates = `${conquest.coordinates.x}|${conquest.coordinates.y}`;
         const playerName = isGain ? conquest.newOwner.name : conquest.oldOwner.name;
         const tribeName = isGain ? conquest.newOwner.tribe : conquest.oldOwner.tribe;
-        
+
         const description = isGain 
             ? `⚔️ ${playerName} de [${tribeName}] ha conquistado una aldea`
             : `💔 ${playerName} de [${tribeName}] ha perdido una aldea`;
+
+        // Mostrar tribu del jugador conquistado entre paréntesis si existe
+        let lostPlayerName = conquest.oldOwner.name;
+        if (isGain && conquest.oldOwner.tribe && conquest.oldOwner.tribe.trim() && conquest.oldOwner.tribe.trim().toLowerCase() !== 'sin tribu') {
+            lostPlayerName += ` (${conquest.oldOwner.tribe})`;
+        }
 
         const embed = new EmbedBuilder()
             .setTitle(title)
@@ -408,7 +436,7 @@ class ConquestAutoMonitor {
                 },
                 {
                     name: isGain ? '👤 Perdida por' : '🎯 Conquistada por',
-                    value: isGain ? conquest.oldOwner.name : conquest.newOwner.name,
+                    value: isGain ? lostPlayerName : conquest.newOwner.name,
                     inline: true
                 },
                 {
