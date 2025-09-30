@@ -380,38 +380,27 @@ class ConquestAutoMonitor {
      * Crea el embed de notificación de conquista
      */
     createConquestEmbed(conquest, isGain) {
-        const title = isGain ? '🟢 ¡ALDEA CONQUISTADA!' : '🔴 ¡ALDEA PERDIDA!';
-        let color = isGain ? '#00ff00' : '#ff0000'; // default green/red
-
-        // Lógica de color avanzada para conquistas ganadas
-        if (isGain) {
-            const conqueringTribe = conquest.newOwner.tribe ? conquest.newOwner.tribe.trim() : '';
-            const lostBy = conquest.oldOwner.name ? conquest.oldOwner.name.trim().toLowerCase() : '';
-            // ¿Es conquistador de la tribu Bollo?
-            if (conqueringTribe.toLowerCase() === 'bollo') {
-                // ¿Conquistó a bárbaros?
-                if (lostBy === 'bárbaro' || lostBy === 'barbaro') {
-                    color = '#3498db'; // Azul
-                } else {
-                    color = '#00ff00'; // Verde
-                }
-            } else {
-                // No es de Bollo
-                if (lostBy === 'bárbaro' || lostBy === 'barbaro') {
-                    color = '#7f8c8d'; // Gris
-                } else {
-                    color = '#632f17ff'; // Marrón
-                }
-            }
-        }
+        // --- NUEVA LÓGICA DE FORMATO ---
+        const conqueringTribe = conquest.newOwner.tribe ? conquest.newOwner.tribe.trim() : '';
+        const lostBy = conquest.oldOwner.name ? conquest.oldOwner.name.trim().toLowerCase() : '';
+        const isBollo = conqueringTribe.toLowerCase() === 'bollo';
+        const isBarbarian = lostBy === 'bárbaro' || lostBy === 'barbaro';
+        const isPlayer = !isBarbarian;
 
         const coordinates = `${conquest.coordinates.x}|${conquest.coordinates.y}`;
-        const playerName = isGain ? conquest.newOwner.name : conquest.oldOwner.name;
-        const tribeName = isGain ? conquest.newOwner.tribe : conquest.oldOwner.tribe;
-
-        const description = isGain 
-            ? `⚔️ ${playerName} de [${tribeName}] ha conquistado una aldea`
-            : `💔 ${playerName} de [${tribeName}] ha perdido una aldea`;
+        const playerName = conquest.newOwner.name;
+        const tribeName = conquest.newOwner.tribe;
+        const villageName = conquest.villageName;
+        const points = conquest.points.toString();
+        const timeStr = new Date(conquest.timestamp * 1000).toLocaleString('es-ES', {
+            timeZone: 'Europe/Madrid',
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
 
         // Mostrar tribu del jugador conquistado entre paréntesis si existe
         let lostPlayerName = conquest.oldOwner.name;
@@ -419,47 +408,73 @@ class ConquestAutoMonitor {
             lostPlayerName += ` (${conquest.oldOwner.tribe})`;
         }
 
+        let title = '';
+        let color = '';
+        let description = '';
+        let fields = [];
+
+        if (isGain && isBollo && isPlayer) {
+            // 1. Conquista de Bollo a jugador real (verde, ejemplo 4)
+            title = '🟢 ¡ALDEA CONQUISTADA!';
+            color = '#00ff00';
+            description = undefined;
+            fields = [
+                { name: '━━━━━━━━━━━━━━━━━━━━━━', value: '\u200B', inline: false },
+                { name: '🏘️ Aldea', value: `${villageName} (${coordinates})`, inline: false },
+                { name: '⚔️ Conquistador', value: `${playerName} [${tribeName}]`, inline: false },
+                { name: '👤 Defensor', value: lostPlayerName, inline: false },
+                { name: '📊 Puntos', value: points, inline: true },
+                { name: '⏰ Tiempo', value: timeStr, inline: true },
+                { name: '━━━━━━━━━━━━━━━━━━━━━━', value: '\u200B', inline: false }
+            ];
+        } else if (isGain && !isBollo && isBarbarian) {
+            // 2. Conquista de bárbaro por enemigo (gris, formato especial)
+            title = '⚪ BÁRBARO CONQUISTADO!';
+            color = '#7f8c8d';
+            description = `⚔️ ${playerName} de [${tribeName}] ha conquistado un pueblo de bárbaros (${coordinates})\n� Puntos: ${points} ⏰ ${timeStr}`;
+            fields = [];
+        } else if (isGain && isBollo && isBarbarian) {
+            // 3. Conquista de bárbaro por Bollo (azul, formato especial)
+            title = '🟦 BÁRBARO CONQUISTADO!';
+            color = '#3498db';
+            description = `⚔️ ${playerName} de [${tribeName}] ha conquistado un pueblo de bárbaros (${coordinates})\n📊 Puntos: ${points} ⏰ ${timeStr}`;
+            fields = [];
+        } else if (isGain && !isBollo && isPlayer) {
+            // 4. Conquista de otra tribu a jugador real (marrón, formato actual pero emoji 🟫)
+            title = '🟫 ¡ALDEA CONQUISTADA!';
+            color = '#a0522d';
+            description = `⚔️ ${playerName} de [${tribeName}] ha conquistado una aldea`;
+            fields = [
+                { name: '🏘️ Aldea', value: `${villageName} (${coordinates})`, inline: true },
+                { name: '🎯 Conquistada por', value: playerName, inline: true },
+                { name: '👤 Perdida por', value: lostPlayerName, inline: true },
+                { name: '📊 Puntos de la aldea', value: points, inline: true },
+                { name: '⏰ Tiempo', value: timeStr, inline: false }
+            ];
+        } else {
+            // Pérdidas y otros casos (mantener formato original)
+            title = isGain ? '🟢 ¡ALDEA CONQUISTADA!' : '🔴 ¡ALDEA PERDIDA!';
+            color = isGain ? '#00ff00' : '#ff0000';
+            description = isGain 
+                ? `⚔️ ${playerName} de [${tribeName}] ha conquistado una aldea`
+                : `💔 ${playerName} de [${tribeName}] ha perdido una aldea`;
+            fields = [
+                { name: '🏘️ Aldea', value: `${villageName} (${coordinates})`, inline: true },
+                { name: isGain ? '🎯 Conquistada por' : '💔 Perdida por', value: playerName, inline: true },
+                { name: isGain ? '👤 Perdida por' : '🎯 Conquistada por', value: isGain ? lostPlayerName : conquest.newOwner.name, inline: true },
+                { name: '📊 Puntos de la aldea', value: points, inline: true },
+                { name: '⏰ Tiempo', value: timeStr, inline: false }
+            ];
+        }
+
         const embed = new EmbedBuilder()
             .setTitle(title)
-            .setDescription(description)
             .setColor(color)
-            .addFields(
-                {
-                    name: '🏘️ Aldea',
-                    value: `${conquest.villageName} (${coordinates})`,
-                    inline: true
-                },
-                {
-                    name: isGain ? '🎯 Conquistada por' : '💔 Perdida por',
-                    value: playerName,
-                    inline: true
-                },
-                {
-                    name: isGain ? '👤 Perdida por' : '🎯 Conquistada por',
-                    value: isGain ? lostPlayerName : conquest.newOwner.name,
-                    inline: true
-                },
-                {
-                    name: '📊 Puntos de la aldea',
-                    value: conquest.points.toString(),
-                    inline: true
-                },
-                {
-                    name: '⏰ Tiempo',
-                    value: new Date(conquest.timestamp * 1000).toLocaleString('es-ES', {
-                        timeZone: 'Europe/Madrid',
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    }),
-                    inline: false
-                }
-            )
             .setTimestamp()
             .setFooter({ text: 'GT ES95 • Sistema de Alertas de Conquistas' });
+
+        if (description) embed.setDescription(description);
+        if (fields.length > 0) embed.addFields(...fields);
 
         return embed;
     }
