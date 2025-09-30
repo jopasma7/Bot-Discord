@@ -360,11 +360,23 @@ class ConquestAutoMonitor {
 
         // Crear embed según el tipo de conquista
         const embed = this.createConquestEmbed(conquest, isGain);
-        
+
+        // Crear botón de acción para ver la conquista en el mapa
+        const { x, y } = conquest.coordinates;
+        const mapUrl = `https://es95.guerrastribales.es/game.php?&screen=map&x=${x}&y=${y}&beacon#${x};${y}`;
+        const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('Ver Conquista')
+                .setStyle(ButtonStyle.Link)
+                .setURL(mapUrl)
+        );
+
         console.log('📝 [SendAlert] Embed preparado, enviando al canal...');
 
         const message = {
-            embeds: [embed]
+            embeds: [embed],
+            components: [row]
         };
 
         // Agregar @everyone según configuración
@@ -429,13 +441,13 @@ class ConquestAutoMonitor {
             ];
         } else if (isGain && !isBollo && isBarbarian) {
             // 2. Conquista de bárbaro por enemigo (gris, formato especial)
-            title = '⚪ BÁRBARO CONQUISTADO!';
+            title = '⚪ ¡BÁRBARO CONQUISTADO!';
             color = '#7f8c8d';
             description = `⚔️ ${playerName} de [${tribeName}] ha conquistado un pueblo de bárbaros (${coordinates})\n� Puntos: ${points} ⏰ ${timeStr}`;
             fields = [];
         } else if (isGain && isBollo && isBarbarian) {
             // 3. Conquista de bárbaro por Bollo (azul, formato especial)
-            title = '🟦 BÁRBARO CONQUISTADO!';
+            title = '🟦 ¡BÁRBARO CONQUISTADO!';
             color = '#3498db';
             description = `⚔️ ${playerName} de [${tribeName}] ha conquistado un pueblo de bárbaros (${coordinates})\n📊 Puntos: ${points} ⏰ ${timeStr}`;
             fields = [];
