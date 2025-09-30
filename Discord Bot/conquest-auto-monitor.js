@@ -431,13 +431,12 @@ class ConquestAutoMonitor {
             color = '#00ff00';
             description = undefined;
             fields = [
-                { name: '━━━━━━━━━━━━━━━━━━━━━━', value: '\u200B', inline: false },
+                { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '.', inline: false },
                 { name: '🏘️ Aldea', value: `${villageName} (${coordinates})`, inline: false },
                 { name: '⚔️ Conquistador', value: `${playerName} [${tribeName}]`, inline: false },
                 { name: '👤 Defensor', value: lostPlayerName, inline: false },
                 { name: '📊 Puntos', value: points, inline: true },
-                { name: '⏰ Tiempo', value: timeStr, inline: true },
-                { name: '━━━━━━━━━━━━━━━━━━━━━━', value: '\u200B', inline: false }
+                { name: '⏰ Tiempo', value: timeStr, inline: true }
             ];
         } else if (isGain && !isBollo && isBarbarian) {
             // 2. Conquista de bárbaro por enemigo (gris, formato especial)
