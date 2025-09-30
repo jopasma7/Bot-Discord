@@ -431,7 +431,6 @@ class ConquestAutoMonitor {
             color = '#00ff00';
             description = undefined;
             fields = [
-                { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '.', inline: false },
                 { name: '🏘️ Aldea', value: `${villageName} (${coordinates})`, inline: false },
                 { name: '⚔️ Conquistador', value: `${playerName} [${tribeName}]`, inline: false },
                 { name: '👤 Defensor', value: lostPlayerName, inline: false },
