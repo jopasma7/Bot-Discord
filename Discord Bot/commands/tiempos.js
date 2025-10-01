@@ -46,7 +46,8 @@ module.exports = {
                 'Espía': 9,
                 'Caballería Ligera': 10,
                 'Caballería Pesada': 11,
-                'Catapulta / Ariete': 30
+                'Catapulta / Ariete': 30,
+                'Noble': 35
             };
 
             // Calcular tiempos de viaje
