@@ -441,13 +441,13 @@ class ConquestAutoMonitor {
             // 2. Conquista de bárbaro por enemigo (gris, formato especial)
             title = '⚪ ¡BÁRBARO CONQUISTADO!';
             color = '#7f8c8d';
-            description = `⚔️ ${playerName} de [${tribeName}] ha conquistado un pueblo de bárbaros (${coordinates})\n� Puntos: ${points} ⏰ ${timeStr}`;
+            description = `⚔️ ${playerName} de [${tribeName}] ha conquistado un pueblo de bárbaros (${coordinates})\n📊 Puntos: ${points}\n⏰ ${timeStr}`;
             fields = [];
         } else if (isGain && isBollo && isBarbarian) {
             // 3. Conquista de bárbaro por Bollo (azul, formato especial)
             title = '🟦 ¡BÁRBARO CONQUISTADO!';
             color = '#3498db';
-            description = `⚔️ ${playerName} de [${tribeName}] ha conquistado un pueblo de bárbaros (${coordinates})\n📊 Puntos: ${points} ⏰ ${timeStr}`;
+            description = `⚔️ ${playerName} de [${tribeName}] ha conquistado un pueblo de bárbaros (${coordinates})\n📊 Puntos: ${points}\n⏰ ${timeStr}`;
             fields = [];
         } else if (isGain && !isBollo && isPlayer) {
             // 4. Conquista de otra tribu a jugador real (marrón, formato actual pero emoji 🟫)
