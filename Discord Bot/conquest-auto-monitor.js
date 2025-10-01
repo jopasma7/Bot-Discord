@@ -462,19 +462,39 @@ class ConquestAutoMonitor {
                 { name: '⏰ Tiempo', value: timeStr, inline: false }
             ];
         } else {
-            // Pérdidas y otros casos (mantener formato original)
-            title = isGain ? '🟢 ¡ALDEA CONQUISTADA!' : '🔴 ¡ALDEA PERDIDA!';
-            color = isGain ? '#00ff00' : '#ff0000';
-            description = isGain 
-                ? `⚔️ ${playerName} de [${tribeName}] ha conquistado una aldea`
-                : `💔 ${playerName} de [${tribeName}] ha perdido una aldea`;
-            fields = [
-                { name: '🏘️ Aldea', value: `${villageName} (${coordinates})`, inline: true },
-                { name: isGain ? '🎯 Conquistada por' : '💔 Perdida por', value: playerName, inline: true },
-                { name: isGain ? '👤 Perdida por' : '🎯 Conquistada por', value: isGain ? lostPlayerName : conquest.newOwner.name, inline: true },
-                { name: '📊 Puntos de la aldea', value: points, inline: true },
-                { name: '⏰ Tiempo', value: timeStr, inline: false }
-            ];
+            // Pérdidas y otros casos
+            if (isGain) {
+                // Ganancia genérica
+                title = '🟢 ¡ALDEA CONQUISTADA!';
+                color = '#00ff00';
+                description = `⚔️ ${playerName} de [${tribeName}] ha conquistado una aldea`;
+                fields = [
+                    { name: '🏘️ Aldea', value: `${villageName} (${coordinates})`, inline: true },
+                    { name: '🎯 Conquistada por', value: playerName, inline: true },
+                    { name: '👤 Perdida por', value: lostPlayerName, inline: true },
+                    { name: '📊 Puntos de la aldea', value: points, inline: true },
+                    { name: '⏰ Tiempo', value: timeStr, inline: false }
+                ];
+            } else {
+                // Pérdida - aquí está el problema
+                // conquest.oldOwner = jugador de Bollo que perdió la aldea
+                // conquest.newOwner = jugador enemigo que conquistó la aldea
+                const lostByPlayer = conquest.oldOwner.name; // Jugador de Bollo que perdió
+                const lostByTribe = conquest.oldOwner.tribe || 'Bollo'; // Tribu del que perdió
+                const conqueredByPlayer = conquest.newOwner.name; // Jugador enemigo que conquistó
+                const conqueredByTribe = conquest.newOwner.tribe ? ` (${conquest.newOwner.tribe})` : '';
+                
+                title = '🔴 ¡ALDEA PERDIDA!';
+                color = '#ff0000';
+                description = `💔 ${lostByPlayer} de [${lostByTribe}] ha perdido una aldea`;
+                fields = [
+                    { name: '🏘️ Aldea', value: `${villageName} (${coordinates})`, inline: true },
+                    { name: '💔 Perdida por', value: `${lostByPlayer} [${lostByTribe}]`, inline: true },
+                    { name: '🎯 Conquistada por', value: `${conqueredByPlayer}${conqueredByTribe}`, inline: true },
+                    { name: '📊 Puntos de la aldea', value: points, inline: true },
+                    { name: '⏰ Tiempo', value: timeStr, inline: false }
+                ];
+            }
         }
 
         const embed = new EmbedBuilder()
