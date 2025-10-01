@@ -43,10 +43,8 @@ module.exports = {
                 'Lancero': 18,
                 'Espada': 22,
                 'Soldado con Hacha': 18,
-                'Arquero': 18,
                 'Espía': 9,
                 'Caballería Ligera': 10,
-                'Arquero a Caballo': 10,
                 'Caballería Pesada': 11,
                 'Catapulta / Ariete': 30
             };
@@ -162,12 +160,11 @@ function getUnitEmoji(unit) {
         'Lancero': '🗡️',
         'Espada': '⚔️',
         'Soldado con Hacha': '🪓',
-        'Arquero': '🏹',
         'Espía': '🔍',
         'Caballería Ligera': '🐎',
-        'Arquero a Caballo': '🏇',
-        'Caballería Pesada': '🛡️',
-        'Catapulta / Ariete': '�'
+        'Caballería Pesada': '🏇',
+        'Catapulta / Ariete': '💥',
+        'Noble': '👑'
     };
     
     return emojis[unit] || '⚔️';
