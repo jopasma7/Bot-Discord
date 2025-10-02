@@ -188,11 +188,26 @@ class GTDataManager {
         
         if (!village) return null;
         
+        // DEBUG: Log village info
+        console.log(`[DEBUG] Village found at (${x}|${y}):`, {
+            id: village.id,
+            name: village.name,
+            playerId: village.playerId,
+            points: village.points
+        });
+        
         // Obtener información del jugador y tribu
         const players = await this.getPlayers();
         const tribes = await this.getTribes();
         
         const player = players.find(p => p.id === village.playerId);
+        
+        // DEBUG: Log player info
+        console.log(`[DEBUG] Player search for playerId ${village.playerId}:`, player ? {
+            id: player.id,
+            name: player.name,
+            tribeId: player.tribeId
+        } : 'NOT FOUND');
         
         // Enriquecer la información del pueblo
         return {
