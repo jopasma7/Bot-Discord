@@ -1,0 +1,41 @@
+# Node modules - siempre ignorar
+node_modules/
+npm-debug.log
+
+# Git
+.git/
+.gitignore
+
+# Documentación
+*.md
+
+# Environment (Zeabur los inyecta)
+.env
+*.env
+
+# Logs
+logs/
+*.log
+
+# Archivos temporales
+.tmp/
+temp/
+test-*.js
+ejemplo-*.js
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Scripts de desarrollo
+docker-*.ps1
+docker-*.sh
