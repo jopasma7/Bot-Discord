@@ -68,11 +68,15 @@ module.exports = {
                 if (!village) {
                     return `❓ Desconocido > Pueblo desconocido (${coords.x}|${coords.y})`;
                 }
-                const playerName = village.playerName || 'Bárbaro';
+                
                 const villageName = village.name || 'Pueblo sin nombre';
                 
-                // Solo mostrar tribu si existe y no está vacía
-                if (village.tribeName && village.tribeName.trim() !== '') {
+                // Verificar si es pueblo bárbaro (playerId === 0)
+                const isBarbarian = village.playerId === 0;
+                const playerName = isBarbarian ? 'Bárbaro' : (village.playerName || 'Jugador desconocido');
+                
+                // Solo mostrar tribu si existe y no está vacía y no es bárbaro
+                if (!isBarbarian && village.tribeName && village.tribeName.trim() !== '') {
                     return `[${village.tribeName}] ${playerName} > ${villageName} (${coords.x}|${coords.y})`;
                 } else {
                     return `${playerName} > ${villageName} (${coords.x}|${coords.y})`;

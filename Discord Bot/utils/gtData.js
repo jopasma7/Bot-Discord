@@ -184,7 +184,22 @@ class GTDataManager {
      */
     async getVillageByCoordinates(x, y) {
         const villages = await this.getVillages();
-        return villages.find(village => village.x === x && village.y === y);
+        const village = villages.find(village => village.x === x && village.y === y);
+        
+        if (!village) return null;
+        
+        // Obtener información del jugador y tribu
+        const players = await this.getPlayers();
+        const tribes = await this.getTribes();
+        
+        const player = players.find(p => p.id === village.playerId);
+        
+        // Enriquecer la información del pueblo
+        return {
+            ...village,
+            playerName: player ? player.name : null,
+            tribeName: player && player.tribeId ? tribes.find(t => t.id === player.tribeId)?.name : null
+        };
     }
 
     /**
