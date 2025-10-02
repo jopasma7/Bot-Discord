@@ -209,12 +209,32 @@ class GTDataManager {
             tribeId: player.tribeId
         } : 'NOT FOUND');
         
+        // Buscar tribu si el jugador tiene tribeId
+        const tribe = player && player.tribeId ? tribes.find(t => t.id === player.tribeId) : null;
+        
+        // DEBUG: Log tribe info
+        if (player && player.tribeId) {
+            console.log(`[DEBUG] Tribe search for tribeId ${player.tribeId}:`, tribe ? {
+                id: tribe.id,
+                name: tribe.name
+            } : 'NOT FOUND');
+        }
+        
         // Enriquecer la información del pueblo
-        return {
+        const enrichedVillage = {
             ...village,
             playerName: player ? player.name : null,
-            tribeName: player && player.tribeId ? tribes.find(t => t.id === player.tribeId)?.name : null
+            tribeName: tribe ? tribe.name : null
         };
+        
+        // DEBUG: Log final result
+        console.log(`[DEBUG] Final enriched village:`, {
+            name: enrichedVillage.name,
+            playerName: enrichedVillage.playerName,
+            tribeName: enrichedVillage.tribeName
+        });
+        
+        return enrichedVillage;
     }
 
     /**
