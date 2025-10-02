@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const GTDataManager = require('../utils/gtData');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -31,6 +32,11 @@ module.exports = {
                 });
             }
 
+            // Obtener información de los pueblos
+            const gtData = new GTDataManager();
+            const villageOrigen = await gtData.getVillageByCoordinates(coordsOrigen.x, coordsOrigen.y);
+            const villageDestino = await gtData.getVillageByCoordinates(coordsDestino.x, coordsDestino.y);
+
             // Calcular distancia
             const distance = calculateDistance(coordsOrigen, coordsDestino);
 
@@ -57,14 +63,33 @@ module.exports = {
                 travelTimes[unit] = formatTime(minutes);
             }
 
+            // Formatear información de pueblos
+            const formatVillageInfo = (village, coords) => {
+                if (!village) {
+                    return `❓ Desconocido > Pueblo desconocido (${coords.x}|${coords.y})`;
+                }
+                const playerName = village.playerName || 'Bárbaro';
+                const villageName = village.name || 'Pueblo sin nombre';
+                
+                // Solo mostrar tribu si existe y no está vacía
+                if (village.tribeName && village.tribeName.trim() !== '') {
+                    return `[${village.tribeName}] ${playerName} > ${villageName} (${coords.x}|${coords.y})`;
+                } else {
+                    return `${playerName} > ${villageName} (${coords.x}|${coords.y})`;
+                }
+            };
+
+            const origenInfo = formatVillageInfo(villageOrigen, coordsOrigen);
+            const destinoInfo = formatVillageInfo(villageDestino, coordsDestino);
+
             // Crear embed con la información
             const embed = new EmbedBuilder()
                 .setColor('#0099ff')
                 .setTitle('⏱️ Calculadora de Distancias y Tiempos')
                 .setDescription(`Cálculo de viaje entre pueblos`)
                 .addFields(
-                    { name: '📍 Origen', value: `\`${coordsOrigen.x}|${coordsOrigen.y}\``, inline: true },
-                    { name: '📍 Destino', value: `\`${coordsDestino.x}|${coordsDestino.y}\``, inline: true },
+                    { name: '📍 Origen', value: origenInfo, inline: false },
+                    { name: '📍 Destino', value: destinoInfo, inline: false },
                     { name: '📏 Distancia', value: `\`${distance.toFixed(2)}\` campos`, inline: true },
                     { name: '\u200B', value: '**⚔️ Tiempos de viaje por unidad:**', inline: false }
                 );
