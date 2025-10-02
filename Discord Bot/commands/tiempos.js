@@ -63,10 +63,10 @@ module.exports = {
                 travelTimes[unit] = formatTime(minutes);
             }
 
-            // Formatear información de pueblos
+            // Formatear información de pueblos (en múltiples líneas)
             const formatVillageInfo = (village, coords) => {
                 if (!village) {
-                    return `❓ Desconocido > Pueblo desconocido (${coords.x}|${coords.y})`;
+                    return `❓ Desconocido\nPueblo desconocido (${coords.x}|${coords.y})`;
                 }
                 
                 const villageName = village.name || 'Pueblo sin nombre';
@@ -75,12 +75,18 @@ module.exports = {
                 const isBarbarian = village.playerId === 0;
                 const playerName = isBarbarian ? 'Bárbaro' : (village.playerName || 'Jugador desconocido');
                 
+                // Formatear en líneas separadas
+                let info = '';
+                
                 // Solo mostrar tribu si existe y no está vacía y no es bárbaro
                 if (!isBarbarian && village.tribeName && village.tribeName.trim() !== '') {
-                    return `[${village.tribeName}] ${playerName} > ${villageName} (${coords.x}|${coords.y})`;
-                } else {
-                    return `${playerName} > ${villageName} (${coords.x}|${coords.y})`;
+                    info += `**[${village.tribeName}]**\n`;
                 }
+                
+                info += `${playerName}\n`;
+                info += `${villageName} (${coords.x}|${coords.y})`;
+                
+                return info;
             };
 
             const origenInfo = formatVillageInfo(villageOrigen, coordsOrigen);
