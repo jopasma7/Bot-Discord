@@ -15,24 +15,25 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        await interaction.deferReply();
-
         try {
             const origen = interaction.options.getString('origen');
             const destino = interaction.options.getString('destino');
 
-            // Parsear coordenadas
+            // Parsear coordenadas ANTES de defer (validación rápida)
             const coordsOrigen = parseCoordinates(origen);
             const coordsDestino = parseCoordinates(destino);
 
             if (!coordsOrigen || !coordsDestino) {
-                return await interaction.editReply({
+                return await interaction.reply({
                     content: '❌ Formato de coordenadas inválido. Usa el formato: `X|Y` (ejemplo: `500|500`)',
                     ephemeral: true
                 });
             }
 
-            // Obtener información de los pueblos
+            // Ahora sí, defer la respuesta (ya validamos, esto es rápido)
+            await interaction.deferReply();
+
+            // Obtener información de los pueblos (puede tardar)
             const gtData = new GTDataManager();
             const villageOrigen = await gtData.getVillageByCoordinates(coordsOrigen.x, coordsOrigen.y);
             const villageDestino = await gtData.getVillageByCoordinates(coordsDestino.x, coordsDestino.y);
@@ -135,10 +136,17 @@ module.exports = {
 
         } catch (error) {
             console.error('Error en comando /tiempos:', error);
-            await interaction.editReply({
-                content: '❌ Ocurrió un error al calcular los tiempos de viaje.',
-                ephemeral: true
-            });
+            
+            // Intentar responder o editar según el estado de la interacción
+            const errorMessage = {
+                content: '❌ Ocurrió un error al calcular los tiempos de viaje. Por favor, intenta de nuevo.'
+            };
+            
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply(errorMessage).catch(console.error);
+            } else {
+                await interaction.reply({ ...errorMessage, ephemeral: true }).catch(console.error);
+            }
         }
     }
 };
