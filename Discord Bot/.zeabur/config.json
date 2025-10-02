@@ -1,5 +1,7 @@
 {
   "build": {
-    "type": "dockerfile"
+    "type": "dockerfile",
+    "dockerfile": "Discord Bot/Dockerfile",
+    "buildContext": "Discord Bot"
   }
 }
