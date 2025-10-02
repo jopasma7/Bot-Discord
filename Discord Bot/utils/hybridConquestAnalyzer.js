@@ -36,6 +36,14 @@ class HybridConquestAnalyzer {
                 continue;
             }
             
+            // Filtrar auto-conquistas (mismo jugador se reconquista a sí mismo)
+            const oldOwnerName = conquest.oldOwner?.name?.trim().toLowerCase();
+            const newOwnerName = conquest.newOwner?.name?.trim().toLowerCase();
+            if (oldOwnerName && newOwnerName && oldOwnerName === newOwnerName) {
+                console.log(`⏭️ [Analyzer] Auto-conquista ignorada: ${conquest.villageName} (${oldOwnerName} → ${newOwnerName})`);
+                continue;
+            }
+            
             // Evitar procesar la misma conquista múltiples veces
             const conquestKey = this.getConquestKey(conquest);
             if (this.processedConquests.has(conquestKey)) {
