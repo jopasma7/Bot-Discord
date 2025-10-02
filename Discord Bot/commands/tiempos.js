@@ -88,9 +88,9 @@ module.exports = {
                 .setTitle('⏱️ Calculadora de Distancias y Tiempos')
                 .setDescription(`Cálculo de viaje entre pueblos`)
                 .addFields(
-                    { name: '📍 Origen', value: origenInfo, inline: false },
-                    { name: '📍 Destino', value: destinoInfo, inline: false },
-                    { name: '📏 Distancia', value: `\`${distance.toFixed(2)}\` campos`, inline: true },
+                    { name: '📍 Origen', value: origenInfo, inline: true },
+                    { name: '📍 Destino', value: destinoInfo, inline: true },
+                    { name: '📏 Distancia', value: `\`${distance.toFixed(2)}\` campos`, inline: false },
                     { name: '\u200B', value: '**⚔️ Tiempos de viaje por unidad:**', inline: false }
                 );
 
